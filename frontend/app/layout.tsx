@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Bubblegum_Sans, Poppins } from "next/font/google";
 import "./globals.css";
+import { PetProvider } from "../components/PetContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,7 +40,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${bubblegumSans.variable} ${poppins.variable} antialiased`}
       >
-        {children}
+        <PetProvider>
+          {children}
+        </PetProvider>
       </body>
     </html>
   );

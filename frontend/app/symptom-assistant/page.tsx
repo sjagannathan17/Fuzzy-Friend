@@ -19,7 +19,7 @@ export default function SymptomAssistant() {
     {
       id: "1",
       type: "ai",
-      content: "Hello! 👋 I'm your AI Symptom Assistant. I can help you assess your pet's symptoms and determine urgency levels. Tell me what symptoms your pet is experiencing.",
+      content: "👋 Hi! I'm your pet assistant. Ask me anything about cats or dogs.",
       timestamp: new Date(Date.now() - 5 * 60000),
     },
   ]);
@@ -135,10 +135,10 @@ export default function SymptomAssistant() {
               <ArrowLeft size={24} />
             </button>
             <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-poppins)" }}>
-              🏥 AI Symptom Assistant
+              Ask me anything about your pet!
             </h1>
           </div>
-          <p className="text-blue-100 text-sm ml-12">Get instant urgency assessment for your pet</p>
+          
         </div>
       </header>
 
@@ -187,6 +187,27 @@ export default function SymptomAssistant() {
         )}
 
         <div ref={messagesEndRef} />
+      </div>
+
+      {/* Pre-existing Questions */}
+      <div className="max-w-2xl mx-auto w-full px-4 mt-2 flex flex-wrap gap-2">
+        {[
+          "What should my pet eat today?",
+          "Any nearby pet clubs/cafes?",
+          "How do I train my pet to behave?",
+          "What vaccines does my pet need?",
+          "How can I keep my pet entertained indoors?",
+          "How often should I walk my dog?"
+        ].map((q) => (
+          <button
+            key={q}
+            className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold hover:bg-blue-200 transition"
+            onClick={() => setInputValue(q)}
+            type="button"
+          >
+            {q}
+          </button>
+        ))}
       </div>
 
       {/* Input Area */}
@@ -249,9 +270,7 @@ export default function SymptomAssistant() {
         </div>
 
         {/* Helper Text */}
-        <p className="text-xs text-gray-500 mt-3" style={{ fontFamily: "var(--font-poppins)" }}>
-          💡 Tip: Describe symptoms in detail (e.g., "vomiting, lethargy, loss of appetite") for better urgency assessment
-        </p>
+        
       </div>
 
       {/* Bottom Navigation */}

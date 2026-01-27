@@ -2,74 +2,120 @@
 
 import { Search, MapPin, Star, Phone, Home, User, MessageCircle, Users, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import dynamic from "next/dynamic";
 
-export default function HomePage() {
+
+const ChatbotModal = dynamic(() => import("../components/chatbot/ChatbotModal"), { ssr: false });
+
+function HomePage() {
+  const clinicScrollRef = useRef<HTMLDivElement>(null);
+  const vetScrollRef = useRef<HTMLDivElement>(null);
+
+  // Manual scroll handlers for arrows
+  const scrollByAmount = (ref: React.RefObject<HTMLDivElement>, direction: 'left' | 'right', amount = 200) => {
+    if (ref.current) {
+      ref.current.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+    }
+  };
   // Placeholder data
   const userGreeting = "Pooja";
   const [activeTab, setActiveTab] = useState("home");
+  const [chatbotOpen, setChatbotOpen] = useState(false);
   const router = useRouter();
-  
+
+  // Hero background images
+  // Use exact filenames as in public folder (with Unicode narrow no-break space U+202F)
+  const heroImages = [
+    "/Screenshot 2026-01-26 at 1.52.39 PM.png",
+    "/Screenshot 2026-01-26 at 1.54.22 PM.png",
+    "/Screenshot 2026-01-26 at 1.54.38 PM.png",
+    "/Screenshot 2026-01-26 at 1.54.48 PM.png",
+  ];
+
   const tabs = [
     { id: "home", icon: Home, label: "Home", href: "/" },
     { id: "profile", icon: User, label: "Profile", href: "/profile" },
     { id: "chat", icon: MessageCircle, label: "Chat", href: "/symptom-assistant" },
     { id: "forum", icon: Users, label: "Forum", href: "/community-forum" },
-    { id: "settings", icon: Settings, label: "Settings", href: "/" },
+    { id: "settings", icon: Settings, label: "Settings", href: "/settings" },
   ];
-  
+
   const clinics = [
-    {
-      id: 1,
-      name: "Paws & Care Clinic",
-      address: "123 Pet St, Downtown",
-      rating: 4.8,
-    },
-    {
-      id: 2,
-      name: "Happy Tails Veterinary",
-      address: "456 Animal Ave, Midtown",
-      rating: 4.9,
-    },
+    { id: 1, name: "Paws Veterinary Clinic", address: "16950 Jog Rd #103, Delray Beach, FL 33446", rating: 5.0, mapsUrl: "https://maps.app.goo.gl/yD5t2sbRUS3Vd6897" },
+    { id: 2, name: "Happy Tails Veterinary", address: "456 Animal Ave, Midtown", rating: 4.9 },
+    { id: 3, name: "City Pet Hospital", address: "789 Main Rd, Uptown", rating: 4.7 },
+    { id: 4, name: "Greenfield Animal Care", address: "321 Oak St, Greenfield", rating: 4.6 },
+    { id: 5, name: "Sunshine Vet Clinic", address: "654 Sun Ave, Sunnyside", rating: 4.8 },
+    { id: 6, name: "Riverbend Veterinary", address: "987 River Rd, Riverbend", rating: 4.5 },
+    { id: 7, name: "Pet Wellness Center", address: "246 Wellness Blvd, Midtown", rating: 4.9 },
+    { id: 8, name: "Companion Animal Hospital", address: "135 Pet Lane, Downtown", rating: 4.7 },
   ];
 
   const vets = [
-    {
-      id: 1,
-      name: "Dr. Sarah Johnson",
-      title: "DVM",
-      hospital: "Paws & Care Clinic",
-      status: "Available to chat",
-      avatar: "🐾",
-    },
-    {
-      id: 2,
-      name: "Dr. Michael Chen",
-      title: "DVM",
-      hospital: "Happy Tails Veterinary",
-      status: "Available to chat",
-      avatar: "🩺",
-    },
+    { id: 1, name: "Dr. Sarah Johnson", title: "DVM", hospital: "Paws & Care Clinic", status: "Available to chat", avatar: "🐾" },
+    { id: 2, name: "Dr. Michael Chen", title: "DVM", hospital: "Happy Tails Veterinary", status: "Available to chat", avatar: "🩺" },
+    { id: 3, name: "Dr. Priya Patel", title: "DVM", hospital: "City Pet Hospital", status: "Available to chat", avatar: "🐶" },
+    { id: 4, name: "Dr. Emily Lee", title: "DVM", hospital: "Greenfield Animal Care", status: "Available to chat", avatar: "🐱" },
+    { id: 5, name: "Dr. Carlos Rivera", title: "DVM", hospital: "Sunshine Vet Clinic", status: "Available to chat", avatar: "🦴" },
+    { id: 6, name: "Dr. Anna Kim", title: "DVM", hospital: "Riverbend Veterinary", status: "Available to chat", avatar: "🐾" },
+    { id: 7, name: "Dr. John Smith", title: "DVM", hospital: "Pet Wellness Center", status: "Available to chat", avatar: "🐕" },
+    { id: 8, name: "Dr. Lisa Wong", title: "DVM", hospital: "Companion Animal Hospital", status: "Available to chat", avatar: "🐈" },
   ];
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
-      {/* Hero Header */}
-      <section className="bg-gradient-to-br from-blue-400 to-blue-500 pt-8 pb-32 px-4 relative">
-        <div className="mx-auto max-w-2xl">
-          <div className="flex items-center justify-between">
+      {/* Hero Header with auto-scrolling screenshots background */}
+      <section className="relative pt-8 pb-32 px-4 overflow-hidden">
+        <style>{`
+          .hero-marquee {
+            display: flex;
+            width: max-content;
+            animation: hero-scroll 28s linear infinite;
+          }
+          @keyframes hero-scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+          }
+        `}</style>
+
+        {/* Moving background screenshots */}
+        <div className="absolute inset-0 z-0 overflow-hidden bg-gray-900">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-400/80 via-blue-500/80 to-blue-600/80" />
+          <div className="absolute left-0 top-0 h-full w-[200%]">
+            <div className="hero-marquee h-full">
+              {[...heroImages, ...heroImages].map((src, idx) => (
+                <div key={idx} className="h-full w-[25vw] min-w-[220px] flex-shrink-0">
+                  <div
+                    className="h-full w-full bg-center bg-cover flex items-center justify-center"
+                    style={{ backgroundImage: `url(${src})` }}
+                  >
+                    <img src={src} alt="screenshot" className="h-full w-full object-cover" style={{ pointerEvents: 'none' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mx-auto max-w-2xl relative z-10">
+          <div className="absolute inset-0 bg-white/70 backdrop-blur-sm rounded-3xl -ml-4 -mr-4" aria-hidden="true"></div>
+          <div className="flex items-center justify-between relative px-4 py-3 rounded-3xl">
             {/* Left: Avatar & Greeting */}
             <div className="flex-1">
-              <h1 className="text-2xl font-semibold text-gray-900">
-                Hello Fuzzy Friend,
+              <h1 className="text-2xl font-semibold text-black">
+                Hello John 👋 
               </h1>
-              <p className="mt-1 text-gray-600 text-sm font-medium" style={{fontFamily: 'var(--font-poppins)'}}>
+              <p className="mt-1 text-black text-sm font-medium" style={{fontFamily: 'var(--font-poppins)'}}>
                 How can we help today?
               </p>
             </div>
-
             {/* Right: Decorative Interactive Paw */}
-            <div className="group cursor-pointer ml-4">
+            <div
+              className="group cursor-pointer ml-4"
+              onClick={() => router.push("/onboarding")}
+              title="Go to onboarding"
+              style={{ cursor: "pointer" }}
+            >
               <style>{`
                 @keyframes paw-rotate {
                   0%, 100% { transform: rotate(0deg) scale(1); }
@@ -90,33 +136,32 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-
-        {/* Quick Symptom Check Card - Overlapping */}
+        {/* Quick Symptom Check Card - Overlapping, styled like hero card */}
         <div className="mx-auto max-w-2xl px-4 -mb-20 relative z-20 mt-12">
-          <div className="bg-white rounded-3xl shadow-xl p-6">
-            <div className="flex items-start justify-between mb-4">
+          <div className="relative">
+            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm rounded-3xl -ml-4 -mr-4" aria-hidden="true"></div>
+            <div className="flex items-center justify-between relative px-4 py-3 rounded-3xl">
               <div className="flex-1">
-                <h2 className="text-lg font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
+                <h2 className="text-lg font-bold text-black" style={{fontFamily: 'var(--font-poppins)'}}>
                   Quick Symptom Check
                 </h2>
-                <p className="text-sm text-gray-600 font-medium mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
-                  Get urgency guidance in under 2 minutes
+                <p className="mt-1 text-black text-sm font-medium" style={{fontFamily: 'var(--font-poppins)'}}>
+                  Let’s check in on your fuzzy friend!
                 </p>
               </div>
               <span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ml-2">
                 Recommended
               </span>
             </div>
-
-        
-
-            {/* CTA Button */}
-            <a
-              href="/onboarding"
-              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-4 rounded-2xl text-center hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95"
-            >
-              Get Started
-            </a>
+            <div className="relative px-4 pb-4">
+              <button
+                type="button"
+                onClick={() => setChatbotOpen(true)}
+                className="w-full block bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-4 rounded-2xl text-center hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95 mt-4"
+              >
+                Let’s Take a Look!
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -124,15 +169,24 @@ export default function HomePage() {
       {/* Content Sections */}
       <div className="mx-auto max-w-2xl px-4 mt-12 space-y-8">
         {/* Nearby Clinics */}
-        <section>
+        <section className="relative mb-8">
+          <div className="bg-white rounded-3xl shadow-lg p-6">
+          <style>{`
+            .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+            .scrollbar-hide::-webkit-scrollbar { display: none; }
+            .clinic-scroll { scroll-snap-type: x mandatory; scroll-behavior: smooth; }
+            .clinic-card { scroll-snap-align: start; scroll-snap-stop: always; }
+            .bubble-bg {
+              background: radial-gradient(circle at 20% 40%, #e0f2fe 30%, transparent 70%),
+                          radial-gradient(circle at 80% 60%, #bae6fd 30%, transparent 70%),
+                          #f0f9ff;
+            }
+          `}</style>
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-medium text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                My Clinics
+                Nearby Clinics
               </h2>
-              <p className="text-sm text-gray-500 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
-                Bensonhurst Veterinary Care
-              </p>
             </div>
             <div className="relative w-32">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -143,43 +197,77 @@ export default function HomePage() {
               />
             </div>
           </div>
-
-          <div className="space-y-3">
-            {clinics.map((clinic) => (
-              <div
-                key={clinic.id}
-                className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-xl flex-shrink-0">
-                    🏥
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-gray-900 text-sm" style={{fontFamily: 'var(--font-poppins)'}}>
-                      {clinic.name}
-                    </h4>
-                    <div className="flex items-center gap-1 text-xs text-gray-600 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
-                      <MapPin size={14} />
-                      <span className="truncate">{clinic.address}</span>
+          <div className="bubble-bg rounded-3xl p-4 relative group">
+            {/* Side Arrows - show on hover */}
+            <button
+              type="button"
+              aria-label="Scroll left"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full shadow p-2 hover:bg-blue-100"
+              style={{ pointerEvents: 'auto' }}
+              onClick={() => scrollByAmount(clinicScrollRef, 'left')}
+            >
+              <span className="sr-only">Scroll left</span>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <button
+              type="button"
+              aria-label="Scroll right"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full shadow p-2 hover:bg-blue-100"
+              style={{ pointerEvents: 'auto' }}
+              onClick={() => scrollByAmount(clinicScrollRef, 'right')}
+            >
+              <span className="sr-only">Scroll right</span>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <div ref={clinicScrollRef} className="clinic-scroll flex gap-4 pb-2 overflow-x-auto scrollbar-hide">
+              {clinics.map((clinic) => {
+                const mapsUrl = clinic.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clinic.name + ' ' + clinic.address)}`;
+                return (
+                  <div
+                    key={clinic.id}
+                    className="clinic-card bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow flex-shrink-0 w-72"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-xl flex-shrink-0">🏥</div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-gray-900 text-sm" style={{fontFamily: 'var(--font-poppins)'}}>
+                          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="hover:underline text-blue-700">
+                            {clinic.name}
+                          </a>
+                        </h4>
+                        <div className="flex items-center gap-1 text-xs text-gray-600 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
+                          <MapPin size={14} />
+                          <span className="truncate">{clinic.address}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Star size={14} className="fill-yellow-400 text-yellow-400" />
+                        <span className="text-xs font-semibold text-gray-700">{clinic.rating}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Star size={14} className="fill-yellow-400 text-yellow-400" />
-                    <span className="text-xs font-semibold text-gray-700">
-                      {clinic.rating}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
+          </div>
           </div>
         </section>
 
         {/* Vets / Available to Chat */}
-        <section>
+        <section className="relative mb-8">
+          <div className="bg-white rounded-3xl shadow-lg p-6">
+          <style>{`
+            .vet-scroll { scroll-snap-type: x mandatory; scroll-behavior: smooth; }
+            .vet-card { scroll-snap-align: start; scroll-snap-stop: always; }
+            .bubble-bg-vet {
+              background: radial-gradient(circle at 80% 30%, #fbcfe8 30%, transparent 70%),
+                          radial-gradient(circle at 20% 70%, #f9a8d4 30%, transparent 70%),
+                          #fdf2f8;
+            }
+          `}</style>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-              👨‍⚕️ Vets
+              Vets
             </h2>
             <div className="relative w-32">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -190,44 +278,77 @@ export default function HomePage() {
               />
             </div>
           </div>
-
-          <div className="space-y-3">
-            {vets.map((vet) => (
-              <div
-                key={vet.id}
-                className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-xl flex-shrink-0">
-                      {vet.avatar}
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-gray-900 text-sm" style={{fontFamily: 'var(--font-poppins)'}}>
-                        {vet.name}, {vet.title}
-                      </h4>
-                      <p className="text-xs text-gray-600 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>{vet.hospital}</p>
-                      <div className="mt-2">
-                        <span className="inline-block bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full" style={{fontFamily: 'var(--font-poppins)'}}>
-                          ✓ {vet.status}
-                        </span>
+          <div className="bubble-bg-vet rounded-3xl p-4 relative group">
+            {/* Side Arrows - show on hover */}
+            <button
+              type="button"
+              aria-label="Scroll left"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full shadow p-2 hover:bg-pink-100"
+              style={{ pointerEvents: 'auto' }}
+              onClick={() => scrollByAmount(vetScrollRef, 'left')}
+            >
+              <span className="sr-only">Scroll left</span>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <button
+              type="button"
+              aria-label="Scroll right"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full shadow p-2 hover:bg-pink-100"
+              style={{ pointerEvents: 'auto' }}
+              onClick={() => scrollByAmount(vetScrollRef, 'right')}
+            >
+              <span className="sr-only">Scroll right</span>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <div ref={vetScrollRef} className="vet-scroll flex gap-4 pb-2 overflow-x-auto scrollbar-hide">
+              {vets.map((vet) => {
+                return (
+                  <div
+                    key={vet.id}
+                    className="vet-card bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow flex-shrink-0 w-80"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center text-xl flex-shrink-0">{vet.avatar}</div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-gray-900 text-sm" style={{fontFamily: 'var(--font-poppins)'}}>
+                            {vet.name === "Dr. Sarah Johnson" ? (
+                              <a href="https://dalemabryanimalhospital.com/dvm/sarah-a-johnson-dvm/" target="_blank" rel="noopener noreferrer" className="hover:underline text-pink-700">
+                                {vet.name}
+                              </a>
+                            ) : vet.name === "Dr. Michael Chen" ? (
+                              <a href="https://coronadoanimalhospital.com/about-us?srsltid=AfmBOopr21g76AHGsAdYsPxHVxOOlhvlcFcMEkwUFH32Ca5xuGyxem16-" target="_blank" rel="noopener noreferrer" className="hover:underline text-pink-700">
+                                {vet.name}
+                              </a>
+                            ) : (
+                              vet.name
+                            )}, {vet.title}
+                          </h4>
+                          <p className="text-xs text-gray-600 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>{vet.hospital}</p>
+                          <div className="mt-2">
+                            <span className="inline-block bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full" style={{fontFamily: 'var(--font-poppins)'}}>
+                              ✓ {vet.status}
+                            </span>
+                          </div>
+                        </div>
                       </div>
+                      <Phone
+                        size={20}
+                        className="text-pink-500 flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
+                      />
                     </div>
                   </div>
-                  <Phone
-                    size={20}
-                    className="text-blue-500 flex-shrink-0 hover:scale-110 transition-transform cursor-pointer"
-                  />
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
+          </div>
           </div>
         </section>
 
         {/* About Us */}
         <section className="mb-8">
           <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-bold text-gray-900 mb-3" style={{fontFamily: 'var(--font-poppins)'}}>
+            <h3 className="text-base font-medium text-gray-900 mb-3" style={{fontFamily: 'var(--font-poppins)'}}>
               About Fuzzy Friend
             </h3>
             <p className="text-sm text-gray-600 font-medium leading-relaxed mb-4" style={{fontFamily: 'var(--font-poppins)'}}>
@@ -287,6 +408,9 @@ export default function HomePage() {
           </div>
         </nav>
       </div>
+      <ChatbotModal open={chatbotOpen} onClose={() => setChatbotOpen(false)} />
     </main>
   );
 }
+
+export default HomePage;
