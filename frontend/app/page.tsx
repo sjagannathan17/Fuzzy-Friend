@@ -112,7 +112,7 @@ function HomePage() {
             {/* Right: Decorative Interactive Paw */}
             <div
               className="group cursor-pointer ml-4"
-              onClick={() => router.push("/onboarding")}
+              onClick={() => router.push("/auth")}
               title="Go to onboarding"
               style={{ cursor: "pointer" }}
             >

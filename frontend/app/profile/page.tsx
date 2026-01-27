@@ -2,7 +2,6 @@
 
 import { ArrowLeft, Edit2, Plus, Calendar, Heart, ClipboardList, TrendingDown } from "lucide-react";
 
-import { usePet } from "../../components/PetContext";
 import Link from "next/link";
 
 function ProfilePage() {
