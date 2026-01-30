@@ -347,7 +347,7 @@ def run_all_tests():
     test_check_red_flags_combined()
     
     print("\n" + "=" * 50)
-    print("✅ ALL SHARED RED FLAGS TESTS PASSED!")
+    print("[PASS] ALL SHARED RED FLAGS TESTS PASSED")
     print("=" * 50)
 
 

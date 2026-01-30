@@ -218,7 +218,7 @@ def run_all_tests():
     test_is_warning_and_is_fatal()
     
     print("\n" + "=" * 50)
-    print("✅ ALL SHARED ERRORS TESTS PASSED!")
+    print("[PASS] ALL SHARED ERRORS TESTS PASSED")
     print("=" * 50)
 
 

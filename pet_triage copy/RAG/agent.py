@@ -21,28 +21,39 @@ Usage:
 import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from dotenv import load_dotenv
 
-# LangChain imports
-from langchain.agents import AgentExecutor, create_openai_functions_agent
+# Load environment variables
+load_dotenv()
+
+# LangChain imports (updated for LangChain 1.2.x / LangGraph)
 from langchain_openai import ChatOpenAI
-from langchain.tools import Tool
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.memory import ConversationBufferMemory
+from langchain_core.tools import tool
 from langchain_core.messages import SystemMessage, HumanMessage
+from langgraph.prebuilt import create_react_agent
 
 # Import existing tools (NO modifications to original files!)
+# Use aliases to avoid naming conflicts with @tool decorated functions
 from rag_chain import ask_simple, ask_with_image, get_chain
 from tools import (
-    check_red_flags,
-    find_nearby_vets,
+    check_red_flags as _check_red_flags_func,
+    check_red_flags_for_agent,
+    find_nearby_vets as _find_nearby_vets_func,
     triage_and_recommend,
-    web_search
+    web_search as _web_search_func,
+    # New triage tools
+    generate_triage_response as _generate_triage_response_func,
+    generate_triage_response_for_agent,
+    request_followup_questions as _request_followup_questions_func,
+    request_followup_for_agent,
+    get_er_template as _get_er_template_func,
+    get_er_template_for_agent,
 )
 from image_analyzer import analyze_pet_image
-from config import load_config
 
-# Load configuration
-config = load_config()
+# Get API key from environment (avoid config import conflicts)
+import os
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 
 # ============================================================
@@ -165,21 +176,52 @@ def _vector_search_wrapper(query: str) -> str:
         return f"Error searching database: {str(e)}"
 
 
-def _check_red_flags_wrapper(symptoms: str) -> str:
-    """Check symptoms for emergency red flags."""
+def _check_red_flags_wrapper(input_str: str) -> str:
+    """
+    Check symptoms for emergency red flags.
+
+    Enhanced to support both simple text AND structured fields (JSON).
+
+    Input can be:
+    - Simple text: "vomiting and lethargy"
+    - JSON: {"symptoms": "...", "species": "dog", "structured_fields": {...}}
+    """
     try:
-        result = check_red_flags(symptoms)
+        # Try to parse as JSON first (structured input)
+        try:
+            import json
+            data = json.loads(input_str)
+            result = _check_red_flags_func(
+                symptoms=data.get("symptoms", ""),
+                pet_species=data.get("species"),
+                pet_breed=data.get("breed"),
+                structured_fields=data.get("structured_fields"),
+                category=data.get("category")
+            )
+        except json.JSONDecodeError:
+            # Fallback to simple text input
+            result = _check_red_flags_func(symptoms=input_str)
+
         severity = result.get("severity", "UNKNOWN")
+        is_emergency = result.get("is_emergency", False)
         flags = result.get("red_flags", [])
         recommendation = result.get("recommendation", "")
-        
+        action = result.get("action", "PROCEED_NORMAL")
+
         output = f"SEVERITY: {severity}\n"
+        output += f"IS_EMERGENCY: {is_emergency}\n"
+        output += f"ACTION: {action}\n"
+
         if flags:
             output += f"\nRed Flags Detected:\n"
             for flag in flags:
                 output += f"- {flag}\n"
+
         output += f"\nRecommendation: {recommendation}"
-        
+
+        if is_emergency:
+            output += "\n\n[EMERGENCY] Use get_er_template tool to return ER response immediately!"
+
         return output
     except Exception as e:
         return f"Error checking symptoms: {str(e)}"
@@ -195,12 +237,12 @@ def _find_vets_wrapper(location_query: str) -> str:
         parts = location_query.split(",")
         if len(parts) < 2:
             return "Error: Please provide location as 'latitude,longitude'"
-        
+
         lat = float(parts[0].strip())
         lon = float(parts[1].strip())
         emergency = "emergency" in location_query.lower()
-        
-        results = find_nearby_vets(
+
+        results = _find_nearby_vets_func(
             latitude=lat,
             longitude=lon,
             emergency_only=emergency,
@@ -227,7 +269,7 @@ def _find_vets_wrapper(location_query: str) -> str:
 def _web_search_wrapper(query: str) -> str:
     """Search the web for latest pet health information."""
     try:
-        result = web_search(query)
+        result = _web_search_func(query)
         return f"Web Search Results:\n{result.get('answer', 'No results found.')}"
     except Exception as e:
         return f"Error in web search: {str(e)}"
@@ -285,117 +327,184 @@ def _analyze_image_wrapper(image_path: str) -> str:
     """
     try:
         result = analyze_pet_image(image_path)
-        
+
         output = f"IMAGE ANALYSIS RESULTS\n\n"
         output += f"Visual Observations:\n{result.get('description', 'N/A')}\n\n"
-        
+
         if result.get('severity'):
             output += f"Assessed Severity: {result['severity']}\n\n"
-        
+
         if result.get('recommendations'):
             output += f"Recommendations:\n"
             for rec in result['recommendations']:
                 output += f"- {rec}\n"
-        
+
         if result.get('concerns'):
             output += f"\nConcerns Identified:\n"
             for concern in result['concerns']:
                 output += f"- {concern}\n"
-        
+
         return output
     except Exception as e:
         return f"Error analyzing image: {str(e)}"
 
 
-# ============================================================
-# Create LangChain Tools
-# ============================================================
+def _generate_triage_wrapper(input_json: str) -> str:
+    """
+    Generate structured triage response.
+    Input: JSON with risk_level, category, reasoning, actions, etc.
+    """
+    return generate_triage_response_for_agent(input_json)
 
-TOOLS = [
-    Tool(
-        name="vector_search",
-        func=_vector_search_wrapper,
-        description=(
-            "Search the pet health knowledge database with 18,909 curated records. "
-            "Use this for medical questions, conditions, treatments, breed information. "
-            "Input: a clear question or search query about pet health. "
-            "This should be your PRIMARY source for pet health information."
-        )
-    ),
-    Tool(
-        name="check_red_flags",
-        func=_check_red_flags_wrapper,
-        description=(
-            "Check symptoms for emergency red flags using rule-based detection. "
-            "ALWAYS use this FIRST when user describes any symptoms. "
-            "Input: description of pet's symptoms. "
-            "Output: severity level (CRITICAL/URGENT/MODERATE/NORMAL) and recommendations."
-        )
-    ),
-    Tool(
-        name="find_nearby_vets",
-        func=_find_vets_wrapper,
-        description=(
-            "Find veterinary clinics near a location. "
-            "Use when severity is CRITICAL/URGENT or user asks for vet recommendations. "
-            "Input: 'latitude,longitude' or 'latitude,longitude,emergency' for emergency-only clinics. "
-            "Example: '37.7749,-122.4194' or '37.7749,-122.4194,emergency'"
-        )
-    ),
-    Tool(
-        name="emergency_triage",
-        func=_emergency_triage_wrapper,
-        description=(
-            "Combined emergency check and vet finder - more efficient than calling separately. "
-            "Use when user provides both symptoms AND location. "
-            "Input: 'symptoms | latitude,longitude' "
-            "Example: 'vomiting and lethargy | 37.7749,-122.4194'"
-        )
-    ),
 
-    Tool(
-        name="web_search",
-        func=_web_search_wrapper,
-        description=(
-            "Search the web for latest pet health information using Gemini + Google Search. "
-            "Use ONLY when you need recent research, new treatments, or current news. "
-            "ALWAYS try vector_search first before using web search. "
-            "Input: a specific search query about recent pet health topics."
-        )
-    ),
-    Tool(
-        name="analyze_image",
-        func=_analyze_image_wrapper,
-        description=(
-            "Analyze a pet photo using GPT-4 Vision to identify visible symptoms and concerns. "
-            "ALWAYS use this when user provides an image. "
-            "Input: file path or URL to the pet image. "
-            "Output: visual observations, severity assessment, and recommendations. "
-            "Useful for: skin conditions, wounds, physical abnormalities, posture issues."
-        )
-    ),
-]
+def _request_followup_wrapper(missing_info: str) -> str:
+    """
+    Generate follow-up questions when information is missing.
+    Input: Description of what info is missing
+    """
+    return request_followup_for_agent(missing_info)
+
+
+def _get_er_template_wrapper(category: str) -> str:
+    """
+    Get pre-built emergency template for a category.
+    Use when check_red_flags returns is_emergency=True.
+    """
+    return get_er_template_for_agent(category)
 
 
 # ============================================================
-# Agent Class
+# Create LangChain Tools (using @tool decorator for LangChain 1.2.x)
+# ============================================================
+
+@tool
+def vector_search(query: str) -> str:
+    """Search the pet health knowledge database with 18,909 curated records.
+    Use this for medical questions, conditions, treatments, breed information.
+    Input: a clear question or search query about pet health.
+    This should be your PRIMARY source for pet health information.
+    """
+    return _vector_search_wrapper(query)
+
+
+@tool
+def check_red_flags(input_str: str) -> str:
+    """Check symptoms for emergency red flags. ALWAYS use this FIRST!
+
+    CRITICAL: Input MUST be a JSON string with this exact format:
+    {"symptoms": "description text", "species": "dog", "breed": "breed name", "category": "symptom category", "structured_fields": {"field1": "value1"}}
+
+    The structured_fields from the user input are critical for accurate emergency detection!
+
+    Output includes: IS_EMERGENCY (True/False), ACTION (RETURN_ER_TEMPLATE if emergency), severity level.
+    If IS_EMERGENCY is True, you MUST immediately call get_er_template with the category.
+    """
+    return _check_red_flags_wrapper(input_str)
+
+
+@tool
+def find_nearby_vets(location_query: str) -> str:
+    """Find veterinary clinics near a location.
+    Use when severity is CRITICAL/URGENT or user asks for vet recommendations.
+    Input: 'latitude,longitude' or 'latitude,longitude,emergency' for emergency-only clinics.
+    Example: '37.7749,-122.4194' or '37.7749,-122.4194,emergency'
+    """
+    return _find_vets_wrapper(location_query)
+
+
+@tool
+def emergency_triage(input_str: str) -> str:
+    """Combined emergency check and vet finder - more efficient than calling separately.
+    Use when user provides both symptoms AND location.
+    Input: 'symptoms | latitude,longitude'
+    Example: 'vomiting and lethargy | 37.7749,-122.4194'
+    """
+    return _emergency_triage_wrapper(input_str)
+
+
+@tool
+def web_search_tool(query: str) -> str:
+    """Search the web for latest pet health information using Gemini + Google Search.
+    Use ONLY when you need recent research, new treatments, or current news.
+    ALWAYS try vector_search first before using web search.
+    Input: a specific search query about recent pet health topics.
+    """
+    return _web_search_wrapper(query)
+
+
+@tool
+def analyze_image(image_path: str) -> str:
+    """Analyze a pet photo using GPT-4 Vision to identify visible symptoms and concerns.
+    ALWAYS use this when user provides an image.
+    Input: file path or URL to the pet image.
+    Output: visual observations, severity assessment, and recommendations.
+    Useful for: skin conditions, wounds, physical abnormalities, posture issues.
+    """
+    return _analyze_image_wrapper(image_path)
+
+
+@tool
+def get_er_template(category: str) -> str:
+    """Get pre-built emergency response template for a symptom category.
+    Use this IMMEDIATELY when check_red_flags returns is_emergency=True.
+    Input: symptom category string (e.g., 'Urinary & Genital', 'Breathing Issues').
+    Output: Complete ER triage response - no LLM reasoning needed.
+    """
+    return _get_er_template_wrapper(category)
+
+
+@tool
+def request_followup(missing_info: str) -> str:
+    """Generate follow-up questions when critical information is missing.
+    Use when you cannot make an accurate assessment due to missing info.
+    Input: description of what information is missing.
+    Example: 'duration of symptoms, severity of vomiting, presence of blood'
+    """
+    return _request_followup_wrapper(missing_info)
+
+
+@tool
+def generate_triage_response(input_json: str) -> str:
+    """Generate final structured triage response. Use this LAST to format output.
+    Input: JSON with required fields:
+    {"risk_level": "ER|TODAY|SOON|MONITOR", "category": "...",
+    "reasoning": ["..."], "actions": ["..."], "monitoring": ["..."]}
+    """
+    return _generate_triage_wrapper(input_json)
+
+
+# Base tools (for general health questions)
+BASE_TOOLS = [vector_search, check_red_flags, find_nearby_vets, emergency_triage, web_search_tool, analyze_image]
+
+# Triage-specific tools (for structured triage workflow)
+TRIAGE_TOOLS = [get_er_template, request_followup, generate_triage_response]
+
+# Combined tools for general use
+TOOLS = BASE_TOOLS
+
+# Full tools including triage-specific ones
+FULL_TRIAGE_TOOLS = BASE_TOOLS + TRIAGE_TOOLS
+
+
+# ============================================================
+# Agent Class (Updated for LangGraph)
 # ============================================================
 
 class PetHealthAgent:
     """
     Autonomous AI Agent for Pet Health assistance.
-    
+
     Unlike the regular RAG chain, this agent can:
     - Decide which tools to use based on context
     - Chain multiple tools together
     - Adapt strategy based on intermediate results
-    
+
     Example:
         agent = PetHealthAgent()
         result = agent.chat("My dog is vomiting, should I be worried?")
         print(result["output"])
     """
-    
+
     def __init__(
         self,
         model: str = "gpt-4-turbo-preview",
@@ -405,7 +514,7 @@ class PetHealthAgent:
     ):
         """
         Initialize the Pet Health Agent.
-        
+
         Args:
             model: OpenAI model to use
             temperature: LLM temperature (0-1)
@@ -416,53 +525,32 @@ class PetHealthAgent:
         self.temperature = temperature
         self.max_iterations = max_iterations
         self.verbose = verbose
-        
+
         # Initialize LLM
         self.llm = ChatOpenAI(
             model=model,
             temperature=temperature,
-            api_key=config.get("openai_api_key")
+            api_key=OPENAI_API_KEY
         )
-        
-        # Create prompt template
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", AGENT_SYSTEM_PROMPT),
-            MessagesPlaceholder(variable_name="chat_history", optional=True),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
-        
-        # Create agent
-        self.agent = create_openai_functions_agent(
-            llm=self.llm,
+
+        # Create agent using LangGraph's create_react_agent
+        self.agent = create_react_agent(
+            model=self.llm,
             tools=TOOLS,
-            prompt=self.prompt
+            prompt=AGENT_SYSTEM_PROMPT,
         )
-        
-        # Create executor
-        self.agent_executor = AgentExecutor(
-            agent=self.agent,
-            tools=TOOLS,
-            verbose=verbose,
-            max_iterations=max_iterations,
-            handle_parsing_errors=True,
-            return_intermediate_steps=True
-        )
-        
-        # Memory for conversation
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True
-        )
-    
+
+        # Simple message history for conversation
+        self.chat_history = []
+
     def chat(self, user_input: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Chat with the agent.
-        
+
         Args:
             user_input: User's question or message
             context: Optional context (pet_info, location, etc.)
-        
+
         Returns:
             Dictionary with:
                 - output: Agent's response
@@ -482,47 +570,377 @@ class PetHealthAgent:
             if "image_path" in context:
                 context_str += f"Image: {context['image_path']}\n"
             full_input = user_input + context_str
-        
+
+        # Build messages
+        messages = self.chat_history + [HumanMessage(content=full_input)]
+
         # Run agent
-        result = self.agent_executor.invoke({
-            "input": full_input,
-            "chat_history": self.memory.chat_memory.messages
-        })
-        
-        # Update memory
-        self.memory.chat_memory.add_user_message(user_input)
-        self.memory.chat_memory.add_ai_message(result["output"])
-        
+        result = self.agent.invoke({"messages": messages})
+
+        # Extract the final response
+        output_messages = result.get("messages", [])
+        final_output = ""
+        tool_calls = []
+
+        for msg in output_messages:
+            # Check for tool calls first (AIMessage with tool_calls often has empty content)
+            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                tool_calls.extend(msg.tool_calls)
+            # Then check for final AI response (has content, no tool_call_id)
+            elif hasattr(msg, 'content') and msg.content and not hasattr(msg, 'tool_call_id'):
+                # This is the final AI response (not a tool result)
+                final_output = msg.content
+
+        # Update history
+        self.chat_history.append(HumanMessage(content=user_input))
+        if final_output:
+            from langchain_core.messages import AIMessage
+            self.chat_history.append(AIMessage(content=final_output))
+
         return {
-            "output": result["output"],
-            "intermediate_steps": result.get("intermediate_steps", []),
-            "chat_history": self.memory.chat_memory.messages
+            "output": final_output,
+            "intermediate_steps": tool_calls,
+            "chat_history": self.chat_history
         }
-    
+
     def reset_memory(self):
         """Clear conversation history."""
-        self.memory.clear()
-    
+        self.chat_history = []
+
     def get_tool_usage_summary(self, result: Dict[str, Any]) -> str:
         """
         Get a summary of which tools were used.
-        
+
         Args:
             result: Result from chat() method
-        
+
         Returns:
             Human-readable summary of tool usage
         """
         steps = result.get("intermediate_steps", [])
         if not steps:
             return "No tools were used."
-        
+
         summary = "Tools used:\n"
-        for i, (action, observation) in enumerate(steps, 1):
-            tool_name = action.tool
-            tool_input = action.tool_input
+        for i, tool_call in enumerate(steps, 1):
+            if isinstance(tool_call, dict):
+                tool_name = tool_call.get("name", "unknown")
+                tool_input = str(tool_call.get("args", {}))[:50]
+            else:
+                tool_name = getattr(tool_call, 'name', str(tool_call))
+                tool_input = str(getattr(tool_call, 'args', ''))[:50]
             summary += f"{i}. {tool_name}({tool_input})\n"
-        
+
+        return summary
+
+
+# ============================================================
+# TRIAGE AGENT SYSTEM PROMPT
+# ============================================================
+
+TRIAGE_AGENT_SYSTEM_PROMPT = """You are a Pet Health Triage Agent. Your job is to assess pet health concerns and provide structured triage responses.
+
+## CRITICAL WORKFLOW - FOLLOW EXACTLY
+
+### Step 1: ALWAYS Check Emergency First
+Before any other action, use the `check_red_flags` tool with a JSON string containing ALL available information.
+
+IMPORTANT: You MUST pass a JSON string to check_red_flags, NOT plain text!
+Example format:
+{"symptoms": "vomiting, lethargy", "species": "dog", "breed": "Great Dane", "category": "Stomach Upset", "structured_fields": {"abdomen_distended": "Yes", "unproductive_retching": "Yes"}}
+
+If the result shows `IS_EMERGENCY: True` or `ACTION: RETURN_ER_TEMPLATE`:
+→ IMMEDIATELY use `get_er_template` tool with the category
+→ Return the ER template as your final response
+→ DO NOT continue with other tools
+
+### Step 2: Check for Missing Information
+If critical information is missing (duration, severity, key symptoms):
+→ Use `request_followup` tool to generate follow-up questions
+→ Return the follow-up response
+
+### Step 3: Gather Additional Context (if needed)
+- If IMAGE is provided → use `analyze_image`
+- If you need medical knowledge → use `vector_search`
+- If location is provided AND urgent → use `find_nearby_vets`
+
+### Step 4: Generate Final Response
+Use `generate_triage_response` tool with:
+- risk_level: "ER" | "TODAY" | "SOON" | "MONITOR"
+- category: the symptom category
+- reasoning: list of reasons for this risk level
+- actions: list of recommended actions
+- monitoring: what to watch for
+
+## Risk Level Definitions
+- ER: Life-threatening, go to emergency vet NOW
+- TODAY: Serious, see a vet within 24 hours
+- SOON: Moderate, schedule appointment within 2-3 days
+- MONITOR: Low risk, monitor at home, see vet if worsens
+
+## Important Rules
+1. SAFETY FIRST: When in doubt, escalate to higher risk level
+2. NO DIAGNOSIS: Never say "your pet has X disease"
+3. NO MEDICATIONS: Never recommend specific drugs or dosages
+4. STRUCTURED OUTPUT: Always use generate_triage_response for final output
+5. TOOL ORDER: check_red_flags → (get_er_template if ER) → other tools → generate_triage_response
+
+## Available Tools Summary
+- check_red_flags: Check for emergencies (ALWAYS USE FIRST)
+- get_er_template: Get ER response template (use if emergency)
+- request_followup: Generate follow-up questions (if info missing)
+- vector_search: Search medical knowledge base
+- analyze_image: Analyze pet photos
+- find_nearby_vets: Find veterinary clinics
+- generate_triage_response: Format final response (ALWAYS USE LAST)
+"""
+
+
+# ============================================================
+# PetTriageAgent Class - Specialized for Triage Workflow
+# ============================================================
+
+class PetTriageAgent:
+    """
+    Specialized Agent for Pet Health Triage.
+
+    Unlike PetHealthAgent (general Q&A), this agent:
+    1. Follows a strict triage workflow
+    2. Uses structured output (TriageResponse schema)
+    3. Prioritizes emergency detection
+    4. Works with input/output guardrails
+
+    Usage:
+        agent = PetTriageAgent()
+        result = agent.triage(
+            species="dog",
+            category="Stomach Upset",
+            structured_fields={"vomiting_frequency": "multiple"},
+            user_description="My dog has been vomiting for 3 hours"
+        )
+        print(result["triage_response"])
+    """
+
+    def __init__(
+        self,
+        model: str = "gpt-4-turbo-preview",
+        temperature: float = 0.3,  # Lower for consistent triage
+        max_iterations: int = 8,
+        verbose: bool = True
+    ):
+        """
+        Initialize the Triage Agent.
+
+        Args:
+            model: OpenAI model to use
+            temperature: LLM temperature (lower = more consistent)
+            max_iterations: Maximum tool calling iterations
+            verbose: Print agent reasoning steps
+        """
+        self.model = model
+        self.temperature = temperature
+        self.max_iterations = max_iterations
+        self.verbose = verbose
+
+        # Initialize LLM
+        self.llm = ChatOpenAI(
+            model=model,
+            temperature=temperature,
+            api_key=OPENAI_API_KEY
+        )
+
+        # Create agent using LangGraph's create_react_agent with triage tools
+        self.agent = create_react_agent(
+            model=self.llm,
+            tools=FULL_TRIAGE_TOOLS,
+            prompt=TRIAGE_AGENT_SYSTEM_PROMPT,
+        )
+
+    def triage(
+        self,
+        species: str,
+        category: str,
+        structured_fields: Dict[str, Any] = None,
+        user_description: str = "",
+        pet_profile: Dict[str, Any] = None,
+        image_base64: str = None,
+        image_path: str = None,
+        latitude: float = None,
+        longitude: float = None
+    ) -> Dict[str, Any]:
+        """
+        Perform triage assessment.
+
+        This is the main entry point for triage. The agent will:
+        1. Check for emergencies
+        2. Gather additional information if needed
+        3. Return a structured TriageResponse
+
+        Args:
+            species: "dog" or "cat"
+            category: Symptom category
+            structured_fields: UI form answers (checkboxes, dropdowns)
+            user_description: Free text description
+            pet_profile: Pet info (name, age, breed, weight)
+            image_base64: Base64 encoded image (optional)
+            image_path: Path to image file (optional)
+            latitude: User latitude for vet finder (optional)
+            longitude: User longitude for vet finder (optional)
+
+        Returns:
+            Dict with:
+                - success: bool
+                - triage_response: Dict (TriageResponse schema)
+                - tools_used: List of tools called
+                - is_emergency: bool
+                - raw_output: Agent's raw text output
+        """
+        import json
+
+        result = {
+            "success": False,
+            "triage_response": None,
+            "tools_used": [],
+            "is_emergency": False,
+            "raw_output": ""
+        }
+
+        # Build the input message for the agent
+        input_parts = []
+
+        input_parts.append(f"Species: {species}")
+        input_parts.append(f"Symptom Category: {category}")
+
+        if user_description:
+            input_parts.append(f"Description: {user_description}")
+
+        if pet_profile:
+            profile_str = ", ".join(f"{k}: {v}" for k, v in pet_profile.items() if v)
+            input_parts.append(f"Pet Profile: {profile_str}")
+
+        if structured_fields:
+            # Format structured fields for the agent
+            fields_str = json.dumps(structured_fields, ensure_ascii=False)
+            input_parts.append(f"Structured Fields (from UI form): {fields_str}")
+
+        if image_path:
+            input_parts.append(f"Image provided: {image_path}")
+
+        if latitude and longitude:
+            input_parts.append(f"Location: {latitude},{longitude}")
+
+        # Add instruction
+        input_parts.append("")
+        input_parts.append("Please perform triage assessment following the workflow:")
+        input_parts.append("1. First check for emergencies using check_red_flags")
+        input_parts.append("2. If emergency, use get_er_template and return immediately")
+        input_parts.append("3. Otherwise, gather context and use generate_triage_response")
+
+        full_input = "\n".join(input_parts)
+
+        try:
+            # Run the agent with LangGraph
+            messages = [HumanMessage(content=full_input)]
+            agent_result = self.agent.invoke({"messages": messages})
+
+            # Extract the final response and tool usage from messages
+            output_messages = agent_result.get("messages", [])
+            final_output = ""
+            tool_calls = []
+
+            for msg in output_messages:
+                # Check for tool calls first (AIMessage with tool_calls often has empty content)
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        tool_calls.append({
+                            "tool": tc.get("name", "unknown"),
+                            "input": str(tc.get("args", {}))[:200]
+                        })
+                # Then check for final AI response (has content, no tool_call_id)
+                elif hasattr(msg, 'content') and msg.content and not hasattr(msg, 'tool_call_id'):
+                    # This is the final AI response (not a tool result)
+                    final_output = msg.content
+
+            result["raw_output"] = final_output
+            result["success"] = True
+            result["tools_used"] = tool_calls
+
+            if self.verbose and tool_calls:
+                print(f"  Agent used {len(tool_calls)} tools:")
+                for tc in tool_calls:
+                    print(f"    - {tc['tool']}")
+
+            # Extract triage response from tool messages
+            # Look for JSON with risk_level in ToolMessages (from get_er_template or generate_triage_response)
+            triage_response = None
+            for msg in output_messages:
+                if 'ToolMessage' in type(msg).__name__ and msg.content:
+                    try:
+                        parsed = json.loads(msg.content)
+                        if isinstance(parsed, dict) and 'risk_level' in parsed:
+                            # Found a valid triage response from tools
+                            triage_response = parsed
+                            if self.verbose:
+                                print(f"  Found triage response in tool output: risk_level={parsed.get('risk_level')}")
+                    except json.JSONDecodeError:
+                        continue
+
+            if triage_response:
+                result["triage_response"] = triage_response
+            else:
+                # Fallback: try to extract JSON from the final AI output
+                raw_output = result["raw_output"]
+                try:
+                    import re
+                    json_match = re.search(r'\{[^{}]*"risk_level"[^{}]*\}', raw_output, re.DOTALL)
+                    if json_match:
+                        result["triage_response"] = json.loads(json_match.group())
+                    else:
+                        result["triage_response"] = json.loads(raw_output)
+                except json.JSONDecodeError:
+                    # If we can't parse JSON, create a basic response from the text
+                    result["triage_response"] = {
+                        "risk_level": "TODAY",
+                        "category": category,
+                        "reasoning_summary": [raw_output[:200] if raw_output else "Unable to parse response"],
+                        "recommended_actions": ["Contact your veterinarian for evaluation"],
+                        "what_to_monitor": [],
+                        "disclaimer": "This is not a diagnosis. Seek veterinary care if concerned."
+                    }
+
+            # Check if this was an emergency
+            result["is_emergency"] = result["triage_response"].get("risk_level") == "ER"
+
+        except Exception as e:
+            result["success"] = False
+            result["error"] = str(e)
+            if self.verbose:
+                print(f"  Agent error: {e}")
+            # Return safe fallback
+            result["triage_response"] = {
+                "risk_level": "TODAY",
+                "category": category,
+                "reasoning_summary": ["Unable to complete assessment"],
+                "recommended_actions": [
+                    "Contact your veterinarian for evaluation",
+                    "Monitor your pet closely"
+                ],
+                "what_to_monitor": ["Any worsening symptoms"],
+                "disclaimer": "This is not a diagnosis. Seek veterinary care if concerned."
+            }
+
+        return result
+
+    def get_tool_usage_summary(self, result: Dict[str, Any]) -> str:
+        """Get a summary of which tools were used."""
+        tools = result.get("tools_used", [])
+        if not tools:
+            return "No tools were used."
+
+        summary = "Tools used:\n"
+        for i, tool_info in enumerate(tools, 1):
+            summary += f"{i}. {tool_info['tool']}({tool_info['input'][:50]}...)\n"
+
         return summary
 
 

@@ -226,7 +226,7 @@ def run_all_tests():
     test_get_triage_system_prompt()
     
     print("\n" + "=" * 50)
-    print("✅ ALL SHARED PROMPTS TESTS PASSED!")
+    print("[PASS] ALL SHARED PROMPTS TESTS PASSED")
     print("=" * 50)
 
 

@@ -86,42 +86,169 @@ BREED_SPECIFIC_ALERTS = {
 
 
 def check_red_flags(
-    symptoms: str,
+    symptoms: str = None,
     pet_species: str = None,
-    pet_breed: str = None
+    pet_breed: str = None,
+    structured_fields: Dict[str, Any] = None,
+    category: str = None
 ) -> Dict[str, Any]:
     """
-    Check user-described symptoms for emergency red flags.
-    
-    This function delegates to the shared module's check_text_for_red_flags()
-    and check_red_flags() functions to maintain a single source of truth.
-    
+    Check for emergency red flags using BOTH text and structured field analysis.
+
+    This is the unified emergency detection tool for the Agent.
+    It combines:
+    1. Structured field rules (more reliable, from UI forms)
+    2. Text keyword matching (fallback for free text)
+
     Args:
-        symptoms: Description of the pet's symptoms
+        symptoms: Free text description of the pet's symptoms
         pet_species: 'dog' or 'cat'
         pet_breed: The pet's breed (for breed-specific alerts)
-    
+        structured_fields: Structured fields from UI (checkboxes, dropdowns)
+        category: Symptom category selected by user
+
     Returns:
-        Dict with severity level, matched symptoms, and recommended action
-    
+        Dict with:
+            - is_emergency: bool - TRUE = go to ER immediately
+            - severity: "CRITICAL" | "URGENT" | "MODERATE" | "LOW"
+            - risk_level: "ER" | "TODAY" | "SOON" | "MONITOR"
+            - red_flags: List of detected red flags
+            - recommendation: Action advice
+            - action: "RETURN_ER_TEMPLATE" | "PROCEED_WITH_URGENCY" | "PROCEED_NORMAL"
+
     NOTE FOR TEAM:
-    - Modify shared/red_flags.py to adjust symptom detection
-    - Add new breed-specific alerts in shared/red_flags.py
+    - Structured field rules: shared/red_flags.py -> check_immediate_er()
+    - Text keyword rules: shared/red_flags.py -> check_text_for_red_flags()
     """
-    # Use shared module implementation
-    result = check_text_for_red_flags(
-        text=symptoms,
-        species=pet_species,
-        breed=pet_breed
-    )
-    
-    # Map severity to unified risk level for consistency
-    severity = result.get("severity", "LOW")
-    
-    # Add recommend_nearby_vets flag based on severity
-    result["recommend_nearby_vets"] = severity == "CRITICAL"
-    
+    from shared.red_flags import check_immediate_er, check_text_for_red_flags
+
+    result = {
+        "is_emergency": False,
+        "severity": "LOW",
+        "risk_level": "MONITOR",
+        "red_flags": [],
+        "breed_alerts": [],
+        "recommendation": "",
+        "action": "PROCEED_NORMAL",
+        "category": category or "Something Else"
+    }
+
+    # =========================================================================
+    # STEP 1: Check structured fields FIRST (more reliable)
+    # =========================================================================
+    if structured_fields:
+        # Build fields dict with all context
+        fields = structured_fields.copy()
+        if pet_species:
+            fields["species"] = pet_species
+        if pet_breed:
+            fields["breed"] = pet_breed
+        if category:
+            fields["category"] = category
+
+        er_result = check_immediate_er(fields)
+
+        if er_result.get("is_er"):
+            result["is_emergency"] = True
+            result["severity"] = "CRITICAL"
+            result["risk_level"] = "ER"
+            result["red_flags"] = er_result.get("red_flags", [])
+            result["category"] = er_result.get("category", category)
+            result["recommendation"] = "EMERGENCY - Seek immediate veterinary care!"
+            result["action"] = "RETURN_ER_TEMPLATE"
+            result["reason"] = er_result.get("reason", "Emergency red flag detected")
+            result["recommend_nearby_vets"] = True
+            return result
+
+    # =========================================================================
+    # STEP 2: Check text keywords (fallback)
+    # =========================================================================
+    if symptoms:
+        text_result = check_text_for_red_flags(
+            text=symptoms,
+            species=pet_species,
+            breed=pet_breed
+        )
+
+        result["severity"] = text_result.get("severity", "LOW")
+        result["red_flags"] = text_result.get("matched_symptoms", [])
+        result["breed_alerts"] = text_result.get("breed_alerts", [])
+        result["recommendation"] = text_result.get("recommendation", "")
+
+        # Map severity to risk level
+        severity_map = {
+            "CRITICAL": ("ER", True, "RETURN_ER_TEMPLATE"),
+            "URGENT": ("TODAY", False, "PROCEED_WITH_URGENCY"),
+            "MODERATE": ("SOON", False, "PROCEED_NORMAL"),
+            "LOW": ("MONITOR", False, "PROCEED_NORMAL")
+        }
+
+        risk_level, is_emergency, action = severity_map.get(
+            result["severity"], ("MONITOR", False, "PROCEED_NORMAL")
+        )
+        result["risk_level"] = risk_level
+        result["is_emergency"] = is_emergency
+        result["action"] = action
+        result["recommend_nearby_vets"] = is_emergency
+
+    # =========================================================================
+    # STEP 3: Default if no symptoms provided
+    # =========================================================================
+    if not result["recommendation"]:
+        result["recommendation"] = "Monitor your pet. If symptoms persist or worsen, consult a veterinarian."
+
     return result
+
+
+def check_red_flags_for_agent(input_json: str) -> str:
+    """
+    Agent-friendly wrapper for check_red_flags.
+
+    This wrapper accepts JSON string input and returns JSON string output,
+    making it compatible with LangChain Tool binding.
+
+    Args:
+        input_json: JSON string with fields:
+            {
+                "symptoms": "free text description",
+                "species": "dog" or "cat",
+                "breed": "pet breed",
+                "category": "symptom category",
+                "structured_fields": {...}  # UI form answers
+            }
+
+    Returns:
+        JSON string with emergency check results
+
+    Example:
+        Input: '{"symptoms": "vomiting blood", "species": "dog"}'
+        Output: '{"is_emergency": true, "severity": "CRITICAL", ...}'
+    """
+    try:
+        data = json.loads(input_json)
+
+        result = check_red_flags(
+            symptoms=data.get("symptoms", ""),
+            pet_species=data.get("species"),
+            pet_breed=data.get("breed"),
+            structured_fields=data.get("structured_fields"),
+            category=data.get("category")
+        )
+
+        return json.dumps(result, ensure_ascii=False)
+
+    except json.JSONDecodeError as e:
+        return json.dumps({
+            "error": f"Invalid JSON: {str(e)}",
+            "is_emergency": False,
+            "action": "PROCEED_NORMAL"
+        })
+    except Exception as e:
+        return json.dumps({
+            "error": str(e),
+            "is_emergency": False,
+            "action": "PROCEED_NORMAL"
+        })
 
 
 # ============================================================
@@ -611,6 +738,237 @@ def search_and_combine(
         result["combined_answer"] = rag_context
     
     return result
+
+
+# ============================================================
+# TRIAGE AGENT TOOLS (for structured output)
+# ============================================================
+
+def generate_triage_response(
+    risk_level: str,
+    category: str,
+    red_flags: List[str] = None,
+    reasoning: List[str] = None,
+    actions: List[str] = None,
+    monitoring: List[str] = None,
+    sources: List[Dict] = None,
+    follow_up_questions: List[str] = None
+) -> Dict[str, Any]:
+    """
+    Generate a structured triage response in the required schema format.
+
+    This tool formats the final triage response. The Agent should gather
+    all information before calling this.
+
+    Args:
+        risk_level: "ER" | "TODAY" | "SOON" | "MONITOR"
+        category: Symptom category
+        red_flags: List of detected red flags
+        reasoning: List of reasoning points (why this risk level)
+        actions: List of recommended actions
+        monitoring: List of things to watch for
+        sources: List of RAG source references (optional)
+        follow_up_questions: Questions if more info needed (optional)
+
+    Returns:
+        Dict with properly formatted TriageResponse
+    """
+    # Validate risk level
+    valid_levels = ["ER", "TODAY", "SOON", "MONITOR"]
+    if risk_level not in valid_levels:
+        risk_level = "TODAY"  # Safe default
+
+    # Ensure lists have content
+    if not reasoning:
+        reasoning = ["Professional evaluation recommended"]
+    if not actions:
+        actions = ["Monitor your pet and contact a veterinarian if concerned"]
+
+    # Truncate long items (max 120 chars per item)
+    def truncate(items, max_len=120):
+        if not items:
+            return []
+        return [item[:max_len-3] + "..." if len(item) > max_len else item for item in items]
+
+    response = {
+        "risk_level": risk_level,
+        "category": category,
+        "red_flags": truncate(red_flags or [])[:5],
+        "reasoning_summary": truncate(reasoning)[:3],
+        "recommended_actions": truncate(actions)[:6],
+        "what_to_monitor": truncate(monitoring or [])[:5],
+        "follow_up_questions": truncate(follow_up_questions or [])[:2],
+        "sources": (sources or [])[:3] if sources else None,
+        "disclaimer": "This is not a veterinary diagnosis. If symptoms worsen or you're concerned, seek veterinary care immediately."
+    }
+
+    return response
+
+
+def generate_triage_response_for_agent(input_json: str) -> str:
+    """
+    Agent-friendly wrapper for generate_triage_response.
+
+    Args:
+        input_json: JSON string with triage response fields
+
+    Returns:
+        JSON string with properly formatted TriageResponse
+    """
+    try:
+        data = json.loads(input_json)
+        result = generate_triage_response(
+            risk_level=data.get("risk_level", "TODAY"),
+            category=data.get("category", "Something Else"),
+            red_flags=data.get("red_flags"),
+            reasoning=data.get("reasoning"),
+            actions=data.get("actions"),
+            monitoring=data.get("monitoring"),
+            sources=data.get("sources"),
+            follow_up_questions=data.get("follow_up_questions")
+        )
+        return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({
+            "risk_level": "TODAY",
+            "category": "Something Else",
+            "reasoning_summary": ["Unable to complete assessment"],
+            "recommended_actions": ["Contact your veterinarian"],
+            "disclaimer": "This is not a diagnosis. Seek veterinary care if concerned.",
+            "_error": str(e)
+        })
+
+
+def request_followup_questions(missing_info: str) -> Dict[str, Any]:
+    """
+    Generate follow-up questions when critical information is missing.
+
+    Use this when you need more information to make an accurate assessment.
+
+    Args:
+        missing_info: Description of what information is missing.
+            E.g., "duration of symptoms, severity of vomiting"
+
+    Returns:
+        Dict with PENDING status and follow-up questions
+    """
+    missing_lower = missing_info.lower()
+    questions = []
+
+    # Map common missing info to questions
+    question_map = {
+        "duration": "How long has this been going on?",
+        "frequency": "How often is this happening?",
+        "blood": "Have you noticed any blood?",
+        "appetite": "Is your pet still eating and drinking?",
+        "energy": "Has your pet's energy level changed?",
+        "vomiting": "How many times has your pet vomited?",
+        "diarrhea": "What does the stool look like?",
+        "pain": "Does your pet seem to be in pain?",
+        "breathing": "Is there any difficulty breathing?",
+        "behavior": "Has there been any change in behavior?",
+        "eating": "When did your pet last eat?",
+        "drinking": "Is your pet drinking water normally?",
+        "urination": "Is your pet urinating normally?",
+    }
+
+    for keyword, question in question_map.items():
+        if keyword in missing_lower and len(questions) < 3:
+            questions.append(question)
+
+    if not questions:
+        questions = [
+            "Can you describe the symptoms in more detail?",
+            "When did you first notice these symptoms?"
+        ]
+
+    return {
+        "status": "PENDING",
+        "risk_level": "PENDING",
+        "follow_up_questions": questions[:3],
+        "reasoning_summary": ["Need more information to complete assessment"],
+        "recommended_actions": ["Please answer the follow-up questions"],
+        "what_to_monitor": [],
+        "disclaimer": "Please answer the follow-up questions for accurate triage."
+    }
+
+
+def request_followup_for_agent(missing_info: str) -> str:
+    """Agent-friendly wrapper for request_followup_questions."""
+    try:
+        result = request_followup_questions(missing_info)
+        return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({
+            "status": "PENDING",
+            "error": str(e),
+            "follow_up_questions": ["Can you provide more details?"]
+        })
+
+
+def get_er_template(category: str) -> Dict[str, Any]:
+    """
+    Get the pre-built emergency template for a specific category.
+
+    Use this when check_red_flags returns is_emergency=True.
+    Returns a complete ER response without needing LLM.
+
+    Args:
+        category: The symptom category for the ER template
+
+    Returns:
+        Dict with complete ER triage response
+    """
+    # Import ER templates
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        from llm_setup import ER_TEMPLATES
+        template = ER_TEMPLATES.get(category, ER_TEMPLATES.get("Something Else", {}))
+    except ImportError:
+        template = {}
+
+    # Default ER template if import fails
+    if not template:
+        template = {
+            "risk_level": "ER",
+            "category": category,
+            "red_flags": ["Emergency condition detected"],
+            "reasoning_summary": ["Symptoms indicate need for immediate care"],
+            "recommended_actions": [
+                "Go to emergency vet immediately",
+                "Keep your pet calm and warm"
+            ],
+            "what_to_monitor": ["Overall condition", "Breathing"],
+            "disclaimer": "This is not a diagnosis. Seek immediate veterinary care."
+        }
+
+    return {
+        "risk_level": "ER",
+        "category": template.get("category", category),
+        "red_flags": template.get("red_flags", ["Emergency detected"]),
+        "reasoning_summary": template.get("reasoning_summary", ["Immediate care required"]),
+        "recommended_actions": template.get("recommended_actions", ["Go to emergency vet"]),
+        "what_to_monitor": template.get("what_to_monitor", ["Overall condition"]),
+        "follow_up_questions": [],
+        "disclaimer": template.get("disclaimer", "Seek immediate veterinary care.")
+    }
+
+
+def get_er_template_for_agent(category: str) -> str:
+    """Agent-friendly wrapper for get_er_template."""
+    try:
+        result = get_er_template(category)
+        return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({
+            "risk_level": "ER",
+            "category": category,
+            "red_flags": ["Emergency detected"],
+            "reasoning_summary": ["Immediate care required"],
+            "recommended_actions": ["Go to emergency vet immediately"],
+            "disclaimer": "Seek immediate veterinary care.",
+            "_error": str(e)
+        })
 
 
 # ============================================================

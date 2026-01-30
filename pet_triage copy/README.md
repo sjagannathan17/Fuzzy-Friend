@@ -1,53 +1,108 @@
 # Pet Triage AI System
 
-An AI-powered symptom triage tool for dogs and cats using OpenAI GPT models. Designed for mobile app integration with safety-first approach. Educational project for ISBA2421 course.
+An AI-powered symptom triage tool for dogs and cats using OpenAI GPT models and LangChain Agents. Designed for mobile app integration with safety-first approach.
 
 ## Project Structure
 
 ```
 pet_triage/
+├── main.py                # Main application (supports Pipeline & Agent modes)
 ├── config.py              # Constants and configuration
 ├── llm_setup.py           # OpenAI client, ER rules, model selection
 ├── prompts.py             # System prompts and message builders
 ├── input_guardrails.py    # 5-layer input validation
 ├── output_guardrails.py   # 6-layer output validation
-├── main.py                # Main application entry point
+├── RAG/                   # RAG & Agent module
+│   ├── agent.py           # LangChain Agent (PetTriageAgent)
+│   ├── tools.py           # Agent tools (check_red_flags, vector_search, etc.)
+│   ├── rag_chain.py       # RAG chain for knowledge base queries
+│   ├── image_analyzer.py  # GPT-4V image analysis
+│   └── config.py          # RAG-specific configuration
+├── shared/                # Shared constants and utilities
+│   ├── constants.py       # Single source of truth for constants
+│   ├── red_flags.py       # Emergency detection rules
+│   └── schemas.py         # Response schemas
 ├── tests/
 │   ├── test_llm_setup.py
 │   ├── test_prompts.py
 │   ├── test_input_guardrails.py
 │   └── test_output_guardrails.py
-├── .env                   # API key (not committed)
+├── .env                   # API keys (not committed)
 └── requirements.txt
 ```
 
 ## Architecture
 
-### Triage Flow
+This system supports **TWO modes** of operation:
+
+### Mode 1: Pipeline Mode (Original LLM-based)
 
 ```
-User Input → Input Guardrails (5 layers, includes ER Check at Layer C)
+User Input → Input Guardrails (5 layers)
     ↓ (if ER triggered → return ER template, skip LLM)
     ↓ (if not emergency)
-Model Selection → Prompt Construction → LLM Call → Output Guardrails (6 layers) → Response
+Model Selection → Prompt Construction → Single LLM Call → Output Guardrails → Response
 ```
+
+### Mode 2: Agent Mode (New - Autonomous Tool Selection)
+
+```
+User Input
+    ↓
+┌─────────────────────────────────────────┐
+│  INPUT GUARDRAILS (mandatory)           │
+│  - Safety checks, input sanitization    │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│  AGENT LOOP (autonomous decisions)      │
+│  LLM autonomously selects tools:        │
+│  ├─ check_red_flags: Emergency detect   │
+│  ├─ vector_search: RAG knowledge base   │
+│  ├─ analyze_image: GPT-4V image analysis│
+│  ├─ find_nearby_vets: Vet finder        │
+│  ├─ get_er_template: ER response        │
+│  └─ generate_triage_response: Output    │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│  OUTPUT GUARDRAILS (mandatory)          │
+│  - Schema validation, risk calibration  │
+└─────────────────────────────────────────┘
+    ↓
+Final Response (TriageResponse)
+```
+
+### Agent Tools
+
+| Tool | Type | Description |
+|------|------|-------------|
+| `check_red_flags` | Rule-based | Check for emergency red flags |
+| `vector_search` | RAG | Search 18,909 pet health records |
+| `analyze_image` | Vision | Analyze pet photos with GPT-4V |
+| `find_nearby_vets` | API | Find nearby vet clinics (OpenStreetMap) |
+| `get_er_template` | Template | Get pre-built ER response |
+| `generate_triage_response` | Generator | Format final triage output |
+| `request_followup` | Generator | Generate follow-up questions |
 
 ### Model Configuration
 
-| Stage    | Model         | Purpose                              |
-|----------|---------------|--------------------------------------|
-| Intake   | gpt-4o-mini   | Low-cost initial classification      |
-| Triage   | gpt-4.1-mini  | Main triage engine                   |
-| Fallback | gpt-4.1       | Complex/uncertain cases              |
+| Stage    | Model              | Purpose                              |
+|----------|--------------------|--------------------------------------|
+| Agent    | gpt-4-turbo-preview| Autonomous tool selection & reasoning|
+| Triage   | gpt-4.1-mini       | Main triage engine (Pipeline mode)  |
+| Fallback | gpt-4.1            | Complex/uncertain cases             |
 
 ### Module Responsibilities
 
-- **main.py**: Orchestrates the complete workflow via `run_triage()` function
-- **llm_setup.py**: OpenAI client setup, ER hard-routing rules, model selection
-- **prompts.py**: System prompts, few-shot examples, message builders for intake/triage/fallback stages
+- **main.py**: Orchestrates workflows via `run_triage()` (Pipeline) and `run_triage_agent()` (Agent)
+- **RAG/agent.py**: `PetHealthAgent` and `PetTriageAgent` classes using LangGraph
+- **RAG/tools.py**: All agent tools with emergency detection, RAG search, vet finder
+- **llm_setup.py**: OpenAI client setup, ER templates, model selection
+- **prompts.py**: System prompts, few-shot examples, message builders
 - **input_guardrails.py**: 5-layer input validation
 - **output_guardrails.py**: 6-layer output validation
-- **config.py**: Constants for species, categories, risk levels, model config, limits
+- **shared/**: Single source of truth for constants, red flags, schemas
 - **tests/**: Unit tests for all modules
 
 ## Features
@@ -81,18 +136,29 @@ Model Selection → Prompt Construction → LLM Call → Output Guardrails (6 la
 pip install -r requirements.txt
 ```
 
-### 2. Set Up API Key
+### 2. Set Up API Keys
 
 Create a `.env` file in the project root:
 
 ```
-OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_API_KEY=sk-your-openai-key
+PINECONE_API_KEY=your-pinecone-key  # For RAG vector search
 ```
 
-### 3. Run Demo (3 test cases)
+### 3. Run Demos
 
 ```bash
+# Run both Pipeline and Agent demos
 python main.py demo
+
+# Run Pipeline mode demo only
+python main.py demo-pipeline
+
+# Run Agent mode demo only
+python main.py demo-agent
+
+# Quick Agent test
+python main.py agent
 ```
 
 ### 4. Run All Unit Tests
@@ -145,6 +211,8 @@ The following conditions trigger immediate ER response WITHOUT calling the LLM (
 
 ## Usage Example
 
+### Pipeline Mode (Original)
+
 ```python
 from main import run_triage
 
@@ -157,14 +225,34 @@ result = run_triage(
         "hours_since_urination": "12+"
     },
     user_description="My cat keeps going to the litter box but can't pee",
-    pet_profile={
-        "name": "Whiskers",
-        "age": "5 years"
-    }
+    pet_profile={"name": "Whiskers", "age": "5 years"}
 )
 
 print(f"Risk Level: {result['response']['risk_level']}")
-print(f"Next Steps: {result['response']['next_steps_now']}")
+print(f"Model Used: {result['model_used']}")
+```
+
+### Agent Mode (New - Autonomous Tool Selection)
+
+```python
+from main import run_triage_agent
+
+result = run_triage_agent(
+    species="dog",
+    category="Stomach Upset",
+    structured_fields={
+        "abdomen_distended": "Yes",
+        "unproductive_retching": "Yes"
+    },
+    user_description="My Great Dane has a swollen belly and keeps trying to vomit",
+    pet_profile={"name": "Duke", "breed": "Great Dane"},
+    verbose=True  # Print agent reasoning
+)
+
+print(f"Risk Level: {result['response']['risk_level']}")
+print(f"Mode: {result['mode']}")  # 'agent'
+print(f"Tools Used: {[t['tool'] for t in result['tools_used']]}")
+# Example: ['check_red_flags', 'get_er_template']
 ```
 
 ## Output JSON Schema
@@ -191,6 +279,3 @@ All responses follow this structure:
 3. **Conservative Escalation**: When uncertain, escalate to higher urgency (under-triage is dangerous)
 4. **Always Disclaimer**: Every response includes medical disclaimer
 
-## License
-
-This project is for educational purposes as part of ISBA2421 course.

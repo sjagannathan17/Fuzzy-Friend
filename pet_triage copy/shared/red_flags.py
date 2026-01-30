@@ -542,7 +542,10 @@ CRITICAL_KEYWORDS = [
     "ate poison", "ate chocolate", "ate xylitol", "antifreeze",
     "bloated stomach", "trying to vomit but can't", "distended abdomen",
     "blue gums", "pale gums", "white gums",
-    "not moving", "paralyzed", "can't walk suddenly"
+    "not moving", "paralyzed", "can't walk suddenly",
+    # Cat-specific breathing emergencies (cats should NEVER pant/open-mouth breathe)
+    "open mouth breathing", "breathing with mouth open", "panting cat",
+    "cat panting", "cat breathing with mouth open", "mouth open breathing"
 ]
 
 URGENT_KEYWORDS = [
@@ -604,6 +607,28 @@ def check_text_for_red_flags(
     text_lower = text.lower()
     matched = []
     breed_alerts = []
+    
+    # ==========================================================================
+    # SPECIES-SPECIFIC CRITICAL CHECKS (before generic keywords)
+    # ==========================================================================
+    
+    # CAT: Any open-mouth breathing / panting is ALWAYS emergency
+    # Cats should NEVER normally pant or breathe with mouth open
+    if species and species.lower() == "cat":
+        cat_breathing_keywords = [
+            "mouth open", "open mouth", "panting", "breathing through mouth",
+            "breathing with mouth", "heavy breathing", "labored breathing"
+        ]
+        for keyword in cat_breathing_keywords:
+            if keyword in text_lower:
+                matched.append(f"Cat {keyword} (cats should NEVER pant normally)")
+                return {
+                    "severity": "CRITICAL",
+                    "risk_level": RiskLevel.ER,
+                    "matched_symptoms": matched,
+                    "breed_alerts": [],
+                    "recommendation": "EMERGENCY - Cat open-mouth breathing is ALWAYS an emergency! Seek immediate veterinary care!"
+                }
     
     # Check CRITICAL keywords
     for keyword in CRITICAL_KEYWORDS:

@@ -366,8 +366,12 @@ Output JSON format (all keys required):
 
 
 # =============================================================================
-# IMAGE ANALYSIS PROMPT
+# IMAGE ANALYSIS PROMPT (DEPRECATED)
 # =============================================================================
+# NOTE: This prompt is NOT used by the actual image analysis module.
+# The real image analysis uses RAG/image_analyzer.py which has its own
+# more detailed IMAGE_ANALYSIS_PROMPT for GPT-4V.
+# This is kept only for backward compatibility.
 
 IMAGE_ANALYSIS_PROMPT = """Analyze this pet photo for visible symptoms.
 
@@ -431,7 +435,12 @@ def get_fallback_system_prompt() -> str:
 
 
 def get_image_analysis_prompt() -> str:
-    """Get prompt for image analysis."""
+    """
+    Get prompt for image analysis.
+
+    DEPRECATED: The actual image analysis uses RAG/image_analyzer.py directly.
+    This function is kept for backward compatibility only.
+    """
     return IMAGE_ANALYSIS_PROMPT
 
 

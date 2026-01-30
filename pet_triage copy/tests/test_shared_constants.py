@@ -187,7 +187,7 @@ def run_all_tests():
     test_default_disclaimer()
     
     print("\n" + "=" * 50)
-    print("✅ ALL SHARED CONSTANTS TESTS PASSED!")
+    print("[PASS] ALL SHARED CONSTANTS TESTS PASSED")
     print("=" * 50)
 
 

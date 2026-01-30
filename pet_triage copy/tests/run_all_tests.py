@@ -56,9 +56,9 @@ class TestResults:
             "TEST RESULTS SUMMARY",
             "=" * 60,
             f"Total tests: {len(self.passed) + len(self.failed) + len(self.skipped)}",
-            f"  ✅ Passed:  {len(self.passed)}",
-            f"  ❌ Failed:  {len(self.failed)}",
-            f"  ⏭️  Skipped: {len(self.skipped)}",
+            f"  [PASS] Passed:  {len(self.passed)}",
+            f"  [FAIL] Failed:  {len(self.failed)}",
+            f"  [SKIP] Skipped: {len(self.skipped)}",
             f"Duration: {duration:.2f} seconds",
             "=" * 60,
         ]
@@ -66,13 +66,13 @@ class TestResults:
         if self.failed:
             lines.append("\nFAILED TESTS:")
             for name, error in self.failed:
-                lines.append(f"  ❌ {name}")
+                lines.append(f"  [FAIL] {name}")
                 lines.append(f"     Error: {error[:100]}...")
         
         if self.skipped:
             lines.append("\nSKIPPED TESTS:")
             for name, reason in self.skipped:
-                lines.append(f"  ⏭️  {name}: {reason}")
+                lines.append(f"  [SKIP] {name}: {reason}")
         
         return "\n".join(lines)
 
