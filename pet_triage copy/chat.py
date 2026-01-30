@@ -15,7 +15,55 @@ sys.path.insert(0, rag_dir)
 
 from RAG.agent import PetHealthAgent
 from RAG.tools import find_nearby_vets
-from input_guardrails import ERPreCheckGuardrails
+from input_guardrails import ERPreCheckGuardrails, ScopeGuardrails, SafetyGuardrails
+
+
+# List of non-supported animals to detect
+NON_SUPPORTED_ANIMALS = [
+    "bird", "parrot", "parakeet", "cockatiel", "canary", "finch",
+    "rabbit", "bunny", "hamster", "guinea pig", "gerbil", "mouse", "rat",
+    "fish", "goldfish", "betta", "tropical fish",
+    "reptile", "snake", "lizard", "gecko", "turtle", "tortoise", "iguana",
+    "ferret", "chinchilla", "hedgehog",
+    "horse", "pony", "donkey",
+    "chicken", "duck", "goose", "turkey",
+    "pig", "goat", "sheep", "cow",
+    "frog", "toad", "salamander", "newt",
+    "spider", "tarantula", "scorpion",
+    "hermit crab", "crab", "lobster",
+    "monkey", "primate",
+    "exotic", "wild animal"
+]
+
+
+def detect_species_from_text(text: str) -> tuple:
+    """
+    Detect species mentioned in text.
+    Returns: (detected_species, is_supported)
+    - detected_species: 'dog', 'cat', or the unsupported animal name
+    - is_supported: True if dog/cat, False otherwise
+    """
+    text_lower = text.lower()
+    
+    # Check for supported species first
+    dog_keywords = ["dog", "puppy", "pup", "canine"]
+    cat_keywords = ["cat", "kitten", "kitty", "feline"]
+    
+    for keyword in dog_keywords:
+        if keyword in text_lower:
+            return "dog", True
+    
+    for keyword in cat_keywords:
+        if keyword in text_lower:
+            return "cat", True
+    
+    # Check for non-supported animals
+    for animal in NON_SUPPORTED_ANIMALS:
+        if animal in text_lower:
+            return animal, False
+    
+    # No animal detected - could be general question
+    return None, None
 
 
 def check_for_emergency(text: str) -> tuple:
@@ -98,6 +146,7 @@ def main():
     print("=" * 60)
     print("Pet Triage AI - Interactive Mode")
     print("=" * 60)
+    print("🐕 🐈 This system only supports DOGS and CATS.")
     print("Type your question about your pet's health.")
     print("Type 'quit' or 'exit' to end the session.")
     print("=" * 60)
@@ -115,6 +164,17 @@ def main():
             if user_input.lower() in ['quit', 'exit', 'q']:
                 print("Goodbye!")
                 break
+
+            # ===== INPUT GUARDRAIL: Species Check =====
+            detected_species, is_supported = detect_species_from_text(user_input)
+            
+            if is_supported == False and detected_species:
+                # User mentioned an unsupported animal
+                print(f"\n❌ Sorry, we currently only support DOGS and CATS.")
+                print(f"   '{detected_species}' is not supported by this system.")
+                print("   Please consult a veterinarian specializing in exotic pets.")
+                print()
+                continue
 
             # Check for emergency keywords first
             is_er, er_response = check_for_emergency(user_input)
