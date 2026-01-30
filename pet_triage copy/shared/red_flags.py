@@ -585,39 +585,193 @@ def _fuzzy_match(text_lower: str, core_words: list) -> bool:
 # Fuzzy matching patterns for CRITICAL emergencies
 # Format: (core_words_required, description)
 CRITICAL_FUZZY_PATTERNS = [
-    # Cat breathing emergencies (cats should NEVER pant)
+    # =========================================================================
+    # BREATHING EMERGENCIES
+    # =========================================================================
+    # Cat breathing (CATS SHOULD NEVER PANT)
     (["cat", "mouth", "open"], "Cat with mouth open"),
     (["cat", "panting"], "Cat panting"),
     (["cat", "breathing", "hard"], "Cat breathing hard"),
+    (["cat", "breathing", "fast"], "Cat breathing fast"),
     (["cat", "heavy", "breathing"], "Cat heavy breathing"),
     (["cat", "labored", "breathing"], "Cat labored breathing"),
+    (["cat", "struggling", "breathe"], "Cat struggling to breathe"),
+    (["cat", "trouble", "breathing"], "Cat trouble breathing"),
+    (["cat", "difficulty", "breathing"], "Cat difficulty breathing"),
+    (["cat", "gasping"], "Cat gasping"),
     (["kitten", "mouth", "open"], "Kitten with mouth open"),
     (["kitten", "panting"], "Kitten panting"),
-    # General breathing emergencies
+    (["kitten", "breathing", "hard"], "Kitten breathing hard"),
+    # General breathing
     (["cannot", "breathe"], "Cannot breathe"),
     (["cant", "breathe"], "Can't breathe"),
+    (["can't", "breathe"], "Can't breathe"),
     (["unable", "breathe"], "Unable to breathe"),
+    (["not", "breathing"], "Not breathing"),
+    (["stopped", "breathing"], "Stopped breathing"),
     (["struggling", "breathe"], "Struggling to breathe"),
+    (["difficulty", "breathing"], "Difficulty breathing"),
     (["hard", "time", "breathing"], "Hard time breathing"),
     (["trouble", "breathing"], "Trouble breathing"),
+    (["gasping", "air"], "Gasping for air"),
+    (["choking"], "Choking"),
+    (["something", "stuck", "throat"], "Something stuck in throat"),
+    # Gum/tongue color
     (["gums", "blue"], "Blue gums"),
     (["gums", "purple"], "Purple gums"),
     (["gums", "pale"], "Pale gums"),
     (["gums", "white"], "White gums"),
-    # Collapse/unconscious
-    (["cannot", "stand"], "Cannot stand"),
-    (["cant", "stand"], "Can't stand"),
-    (["unable", "stand"], "Unable to stand"),
-    (["passed", "out"], "Passed out"),
-    (["not", "responding"], "Not responding"),
-    # Bloat
-    (["stomach", "swollen", "hard"], "Swollen hard stomach"),
+    (["gums", "gray"], "Gray gums"),
+    (["tongue", "blue"], "Blue tongue"),
+    (["tongue", "purple"], "Purple tongue"),
+    
+    # =========================================================================
+    # URINARY EMERGENCIES (especially male cats)
+    # =========================================================================
+    (["cat", "cannot", "pee"], "Cat cannot pee"),
+    (["cat", "cant", "pee"], "Cat can't pee"),
+    (["cat", "can't", "pee"], "Cat can't pee"),
+    (["cat", "straining", "pee"], "Cat straining to pee"),
+    (["cat", "straining", "urinate"], "Cat straining to urinate"),
+    (["cat", "trying", "pee"], "Cat trying to pee"),
+    (["cat", "litter", "box", "crying"], "Cat crying in litter box"),
+    (["male", "cat", "blocked"], "Male cat blocked"),
+    (["male", "cat", "straining"], "Male cat straining"),
+    (["cannot", "urinate"], "Cannot urinate"),
+    (["cant", "urinate"], "Can't urinate"),
+    (["blocked", "urinary"], "Urinary blockage"),
+    (["no", "urine"], "No urine"),
+    (["not", "urinating"], "Not urinating"),
+    
+    # =========================================================================
+    # SEIZURE EMERGENCIES
+    # =========================================================================
+    (["having", "seizure"], "Having seizure"),
+    (["seizure", "now"], "Seizure now"),
+    (["convulsing"], "Convulsing"),
+    (["shaking", "uncontrollably"], "Shaking uncontrollably"),
+    (["violent", "shaking"], "Violent shaking"),
+    (["whole", "body", "shaking"], "Whole body shaking"),
+    (["foaming", "mouth"], "Foaming at mouth"),
+    (["paddling", "legs"], "Paddling legs"),
+    (["multiple", "seizures"], "Multiple seizures"),
+    (["seizure", "wont", "stop"], "Seizure won't stop"),
+    
+    # =========================================================================
+    # BLOAT/GDV EMERGENCIES
+    # =========================================================================
+    (["stomach", "swollen"], "Swollen stomach"),
+    (["stomach", "bloated"], "Bloated stomach"),
+    (["belly", "swollen"], "Swollen belly"),
+    (["belly", "hard"], "Hard belly"),
+    (["abdomen", "distended"], "Distended abdomen"),
     (["trying", "vomit", "nothing"], "Trying to vomit nothing"),
     (["dry", "heaving"], "Dry heaving"),
-    # Poisoning
+    (["retching", "nothing"], "Retching nothing"),
+    (["unproductive", "vomiting"], "Unproductive vomiting"),
+    (["stomach", "twisted"], "Stomach twisted"),
+    (["wont", "lie", "down"], "Won't lie down"),
+    
+    # =========================================================================
+    # BLEEDING/TRAUMA EMERGENCIES
+    # =========================================================================
+    (["bleeding", "stop"], "Bleeding won't stop"),
+    (["bleeding", "wont", "stop"], "Bleeding won't stop"),
+    (["severe", "bleeding"], "Severe bleeding"),
+    (["heavy", "bleeding"], "Heavy bleeding"),
+    (["blood", "everywhere"], "Blood everywhere"),
+    (["blood", "gushing"], "Blood gushing"),
+    (["blood", "spurting"], "Blood spurting"),
+    (["hit", "by", "car"], "Hit by car"),
+    (["attacked", "by"], "Attacked by animal"),
+    (["deep", "wound"], "Deep wound"),
+    (["deep", "cut"], "Deep cut"),
+    
+    # =========================================================================
+    # POISONING EMERGENCIES
+    # =========================================================================
     (["ate", "chocolate"], "Ate chocolate"),
     (["ate", "poison"], "Ate poison"),
-    (["swallowed", "toxic"], "Swallowed toxic substance"),
+    (["ate", "toxic"], "Ate toxic substance"),
+    (["swallowed", "poison"], "Swallowed poison"),
+    (["ate", "lily"], "Ate lily"),
+    (["ate", "lilies"], "Ate lilies"),
+    (["ate", "grape"], "Ate grapes"),
+    (["ate", "raisin"], "Ate raisins"),
+    (["ate", "xylitol"], "Ate xylitol"),
+    (["ate", "medication"], "Ate medication"),
+    (["ate", "pills"], "Ate pills"),
+    (["ate", "rat", "poison"], "Ate rat poison"),
+    (["drank", "antifreeze"], "Drank antifreeze"),
+    (["got", "into", "poison"], "Got into poison"),
+    (["poisoning"], "Poisoning suspected"),
+    
+    # =========================================================================
+    # COLLAPSE/UNCONSCIOUS EMERGENCIES
+    # =========================================================================
+    (["collapsed"], "Collapsed"),
+    (["fell", "over"], "Fell over"),
+    (["cannot", "stand"], "Cannot stand"),
+    (["cant", "stand"], "Can't stand"),
+    (["can't", "stand"], "Can't stand"),
+    (["unable", "stand"], "Unable to stand"),
+    (["cannot", "walk"], "Cannot walk"),
+    (["cant", "walk"], "Can't walk"),
+    (["not", "responding"], "Not responding"),
+    (["unresponsive"], "Unresponsive"),
+    (["unconscious"], "Unconscious"),
+    (["passed", "out"], "Passed out"),
+    (["fainted"], "Fainted"),
+    (["not", "moving"], "Not moving"),
+    (["lifeless"], "Lifeless"),
+    (["not", "waking", "up"], "Not waking up"),
+    (["paralyzed"], "Paralyzed"),
+    (["cannot", "move"], "Cannot move"),
+    
+    # =========================================================================
+    # EYE EMERGENCIES
+    # =========================================================================
+    (["eye", "popping", "out"], "Eye popping out"),
+    (["eye", "bulging"], "Eye bulging"),
+    (["eye", "swollen", "shut"], "Eye swollen shut"),
+    (["eye", "bleeding"], "Eye bleeding"),
+    (["chemical", "in", "eye"], "Chemical in eye"),
+    (["eye", "punctured"], "Eye punctured"),
+    (["sudden", "blindness"], "Sudden blindness"),
+    
+    # =========================================================================
+    # HEATSTROKE EMERGENCIES
+    # =========================================================================
+    (["heat", "stroke"], "Heat stroke"),
+    (["heatstroke"], "Heatstroke"),
+    (["overheated"], "Overheated"),
+    (["left", "in", "car"], "Left in hot car"),
+    (["hot", "car"], "Hot car"),
+    (["bright", "red", "tongue"], "Bright red tongue"),
+    
+    # =========================================================================
+    # ALLERGIC REACTION EMERGENCIES
+    # =========================================================================
+    (["face", "swelling"], "Face swelling"),
+    (["face", "swollen"], "Face swollen"),
+    (["throat", "swelling"], "Throat swelling"),
+    (["throat", "swollen"], "Throat swollen"),
+    (["tongue", "swelling"], "Tongue swelling"),
+    (["allergic", "reaction"], "Allergic reaction"),
+    (["anaphylaxis"], "Anaphylaxis"),
+    (["bee", "sting", "swelling"], "Bee sting with swelling"),
+    (["swelling", "rapidly"], "Swelling rapidly"),
+    
+    # =========================================================================
+    # BIRTHING EMERGENCIES
+    # =========================================================================
+    (["labor", "hours"], "In labor for hours"),
+    (["giving", "birth", "stuck"], "Giving birth stuck"),
+    (["puppy", "stuck"], "Puppy stuck"),
+    (["kitten", "stuck"], "Kitten stuck"),
+    (["cannot", "deliver"], "Cannot deliver"),
+    (["straining", "birth"], "Straining to give birth"),
+    (["green", "discharge"], "Green discharge during labor"),
 ]
 
 
