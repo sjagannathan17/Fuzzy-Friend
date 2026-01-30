@@ -234,10 +234,11 @@ class ERPreCheckGuardrails:
     """
     Layer C: Immediate ER Pre-check
     
-    Run deterministic ER red flag check before calling LLM
+    Run deterministic ER red flag check before calling LLM.
+    Uses fuzzy matching to catch variations of emergency keywords.
     """
     
-    # Text keyword fallback detection
+    # Exact keyword matching (original list for backward compatibility)
     TEXT_ER_KEYWORDS = {
         "breathing": [
             "open mouth breathing", "can't breathe", "gasping", "blue gums",
@@ -268,10 +269,100 @@ class ERPreCheckGuardrails:
         ]
     }
     
+    # Fuzzy matching patterns: (core_words_required, category, description)
+    # If ALL core words appear anywhere in text, it's a match
+    FUZZY_PATTERNS = {
+        "breathing": [
+            # Cat open-mouth breathing variations
+            (["cat", "mouth", "open"], "Cat with mouth open (breathing emergency)"),
+            (["cat", "panting"], "Cat panting (cats should never pant)"),
+            (["cat", "breathing", "mouth"], "Cat breathing through mouth"),
+            (["cat", "heavy", "breathing"], "Cat heavy breathing"),
+            (["cat", "labored", "breathing"], "Cat labored breathing"),
+            (["kitten", "mouth", "open"], "Kitten with mouth open"),
+            (["kitten", "panting"], "Kitten panting"),
+            # General breathing emergencies
+            (["cannot", "breathe"], "Cannot breathe"),
+            (["cant", "breathe"], "Can't breathe"),
+            (["unable", "breathe"], "Unable to breathe"),
+            (["struggling", "breathe"], "Struggling to breathe"),
+            (["difficulty", "breathing"], "Difficulty breathing"),
+            (["hard", "time", "breathing"], "Hard time breathing"),
+            (["trouble", "breathing"], "Trouble breathing"),
+            (["gums", "blue"], "Blue gums"),
+            (["gums", "purple"], "Purple gums"),
+            (["gums", "pale"], "Pale gums"),
+            (["gums", "white"], "White gums"),
+        ],
+        "urinary": [
+            (["cat", "cannot", "pee"], "Cat cannot pee"),
+            (["cat", "cant", "pee"], "Cat can't pee"),
+            (["cat", "unable", "urinate"], "Cat unable to urinate"),
+            (["cat", "straining", "urinate"], "Cat straining to urinate"),
+            (["cat", "trying", "pee"], "Cat trying to pee"),
+            (["male", "cat", "litter"], "Male cat litter box issues"),
+            (["blocked", "urinary"], "Urinary blockage"),
+            (["no", "urine"], "No urine production"),
+        ],
+        "seizure": [
+            (["having", "seizure"], "Having seizure"),
+            (["seizure", "now"], "Seizure now"),
+            (["convulsing"], "Convulsing"),
+            (["shaking", "uncontrollably"], "Shaking uncontrollably"),
+            (["violent", "shaking"], "Violent shaking"),
+        ],
+        "bloat": [
+            (["stomach", "swollen"], "Swollen stomach"),
+            (["belly", "hard"], "Hard belly"),
+            (["abdomen", "distended"], "Distended abdomen"),
+            (["trying", "vomit", "nothing"], "Trying to vomit nothing"),
+            (["dry", "heaving"], "Dry heaving"),
+            (["retching", "nothing"], "Retching nothing"),
+        ],
+        "bleeding": [
+            (["bleeding", "stop"], "Bleeding won't stop"),
+            (["blood", "everywhere"], "Blood everywhere"),
+            (["severe", "bleeding"], "Severe bleeding"),
+            (["heavy", "blood"], "Heavy blood loss"),
+            (["bleeding", "lot"], "Bleeding a lot"),
+        ],
+        "poisoning": [
+            (["ate", "chocolate"], "Ate chocolate"),
+            (["ate", "poison"], "Ate poison"),
+            (["swallowed", "poison"], "Swallowed poison"),
+            (["ingested", "toxic"], "Ingested toxic substance"),
+            (["ate", "lily"], "Ate lily (toxic to cats)"),
+            (["ate", "grape"], "Ate grapes"),
+            (["ate", "raisin"], "Ate raisins"),
+            (["drank", "antifreeze"], "Drank antifreeze"),
+        ],
+        "collapse": [
+            (["collapsed"], "Collapsed"),
+            (["fell", "over"], "Fell over"),
+            (["cannot", "stand"], "Cannot stand"),
+            (["cant", "stand"], "Can't stand"),
+            (["unable", "stand"], "Unable to stand"),
+            (["not", "responding"], "Not responding"),
+            (["unresponsive"], "Unresponsive"),
+            (["unconscious"], "Unconscious"),
+            (["passed", "out"], "Passed out"),
+        ]
+    }
+    
+    @classmethod
+    def _fuzzy_match(cls, text_lower: str, core_words: list) -> bool:
+        """
+        Check if ALL core words appear in the text (order doesn't matter).
+        This allows matching variations like:
+        - "my cat keeps his mouth open" matches ["cat", "mouth", "open"]
+        - "cat is breathing with his mouth open" matches ["cat", "mouth", "open"]
+        """
+        return all(word in text_lower for word in core_words)
+    
     @classmethod
     def check_text_for_er(cls, text: str) -> Tuple[bool, Optional[str]]:
         """
-        Detect ER keywords from text (fallback method)
+        Detect ER keywords from text using both exact and fuzzy matching.
         
         Returns: (is_er_detected, detected_category)
         """
@@ -290,9 +381,16 @@ class ERPreCheckGuardrails:
             "collapse": "Concerning Behaviour Changes"
         }
         
+        # Method 1: Exact keyword matching (fast, original behavior)
         for key, keywords in cls.TEXT_ER_KEYWORDS.items():
             for keyword in keywords:
                 if keyword.lower() in text_lower:
+                    return True, keyword_to_category[key]
+        
+        # Method 2: Fuzzy pattern matching (catches more variations)
+        for key, patterns in cls.FUZZY_PATTERNS.items():
+            for core_words, description in patterns:
+                if cls._fuzzy_match(text_lower, core_words):
                     return True, keyword_to_category[key]
         
         return False, None

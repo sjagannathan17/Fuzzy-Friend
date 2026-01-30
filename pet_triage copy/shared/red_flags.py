@@ -572,13 +572,62 @@ MODERATE_KEYWORDS = [
 ]
 
 
+def _fuzzy_match(text_lower: str, core_words: list) -> bool:
+    """
+    Check if ALL core words appear in the text (order doesn't matter).
+    This allows matching variations like:
+    - "my cat keeps his mouth open" matches ["cat", "mouth", "open"]
+    - "cat is breathing with his mouth open" matches ["cat", "mouth", "open"]
+    """
+    return all(word in text_lower for word in core_words)
+
+
+# Fuzzy matching patterns for CRITICAL emergencies
+# Format: (core_words_required, description)
+CRITICAL_FUZZY_PATTERNS = [
+    # Cat breathing emergencies (cats should NEVER pant)
+    (["cat", "mouth", "open"], "Cat with mouth open"),
+    (["cat", "panting"], "Cat panting"),
+    (["cat", "breathing", "hard"], "Cat breathing hard"),
+    (["cat", "heavy", "breathing"], "Cat heavy breathing"),
+    (["cat", "labored", "breathing"], "Cat labored breathing"),
+    (["kitten", "mouth", "open"], "Kitten with mouth open"),
+    (["kitten", "panting"], "Kitten panting"),
+    # General breathing emergencies
+    (["cannot", "breathe"], "Cannot breathe"),
+    (["cant", "breathe"], "Can't breathe"),
+    (["unable", "breathe"], "Unable to breathe"),
+    (["struggling", "breathe"], "Struggling to breathe"),
+    (["hard", "time", "breathing"], "Hard time breathing"),
+    (["trouble", "breathing"], "Trouble breathing"),
+    (["gums", "blue"], "Blue gums"),
+    (["gums", "purple"], "Purple gums"),
+    (["gums", "pale"], "Pale gums"),
+    (["gums", "white"], "White gums"),
+    # Collapse/unconscious
+    (["cannot", "stand"], "Cannot stand"),
+    (["cant", "stand"], "Can't stand"),
+    (["unable", "stand"], "Unable to stand"),
+    (["passed", "out"], "Passed out"),
+    (["not", "responding"], "Not responding"),
+    # Bloat
+    (["stomach", "swollen", "hard"], "Swollen hard stomach"),
+    (["trying", "vomit", "nothing"], "Trying to vomit nothing"),
+    (["dry", "heaving"], "Dry heaving"),
+    # Poisoning
+    (["ate", "chocolate"], "Ate chocolate"),
+    (["ate", "poison"], "Ate poison"),
+    (["swallowed", "toxic"], "Swallowed toxic substance"),
+]
+
+
 def check_text_for_red_flags(
     text: str,
     species: str = None,
     breed: str = None
 ) -> Dict[str, Any]:
     """
-    Check free text description for red flag keywords.
+    Check free text description for red flag keywords using both exact and fuzzy matching.
     
     This is a FALLBACK method when structured fields don't trigger ER.
     
@@ -627,7 +676,8 @@ def check_text_for_red_flags(
     if detected_species == "cat":
         cat_breathing_keywords = [
             "mouth open", "open mouth", "panting", "breathing through mouth",
-            "breathing with mouth", "heavy breathing", "labored breathing"
+            "breathing with mouth", "heavy breathing", "labored breathing",
+            "hard time breathing", "trouble breathing", "breathing hard"
         ]
         for keyword in cat_breathing_keywords:
             if keyword in text_lower:
@@ -640,7 +690,9 @@ def check_text_for_red_flags(
                     "recommendation": "EMERGENCY - Cat open-mouth breathing is ALWAYS an emergency! Seek immediate veterinary care!"
                 }
     
-    # Check CRITICAL keywords
+    # ==========================================================================
+    # EXACT KEYWORD MATCHING (original behavior)
+    # ==========================================================================
     for keyword in CRITICAL_KEYWORDS:
         if keyword in text_lower:
             matched.append(keyword)
@@ -653,6 +705,20 @@ def check_text_for_red_flags(
             "breed_alerts": breed_alerts,
             "recommendation": "EMERGENCY - Seek immediate veterinary care! Call emergency vet now."
         }
+    
+    # ==========================================================================
+    # FUZZY PATTERN MATCHING (catches variations)
+    # ==========================================================================
+    for core_words, description in CRITICAL_FUZZY_PATTERNS:
+        if _fuzzy_match(text_lower, core_words):
+            matched.append(description)
+            return {
+                "severity": "CRITICAL",
+                "risk_level": RiskLevel.ER,
+                "matched_symptoms": matched,
+                "breed_alerts": breed_alerts,
+                "recommendation": "EMERGENCY - Seek immediate veterinary care! Call emergency vet now."
+            }
     
     # Check URGENT keywords
     for keyword in URGENT_KEYWORDS:
