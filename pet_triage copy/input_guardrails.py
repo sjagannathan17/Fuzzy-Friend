@@ -241,7 +241,9 @@ class ERPreCheckGuardrails:
     TEXT_ER_KEYWORDS = {
         "breathing": [
             "open mouth breathing", "can't breathe", "gasping", "blue gums",
-            "choking", "struggling to breathe", "labored breathing"
+            "choking", "struggling to breathe", "labored breathing",
+            "breathing with mouth open", "mouth open", "cat panting",
+            "panting cat", "cat breathing with mouth"
         ],
         "urinary": [
             "can't urinate", "straining to pee", "no urine", "blocked",

@@ -545,7 +545,8 @@ CRITICAL_KEYWORDS = [
     "not moving", "paralyzed", "can't walk suddenly",
     # Cat-specific breathing emergencies (cats should NEVER pant/open-mouth breathe)
     "open mouth breathing", "breathing with mouth open", "panting cat",
-    "cat panting", "cat breathing with mouth open", "mouth open breathing"
+    "cat panting", "cat breathing with mouth open", "mouth open breathing",
+    "cat mouth open", "cat open mouth"
 ]
 
 URGENT_KEYWORDS = [
@@ -612,9 +613,18 @@ def check_text_for_red_flags(
     # SPECIES-SPECIFIC CRITICAL CHECKS (before generic keywords)
     # ==========================================================================
     
+    # Detect species from text if not provided
+    detected_species = species.lower() if species else None
+    if not detected_species:
+        # Try to detect from text
+        if "cat" in text_lower or "kitten" in text_lower or "feline" in text_lower:
+            detected_species = "cat"
+        elif "dog" in text_lower or "puppy" in text_lower or "canine" in text_lower:
+            detected_species = "dog"
+    
     # CAT: Any open-mouth breathing / panting is ALWAYS emergency
     # Cats should NEVER normally pant or breathe with mouth open
-    if species and species.lower() == "cat":
+    if detected_species == "cat":
         cat_breathing_keywords = [
             "mouth open", "open mouth", "panting", "breathing through mouth",
             "breathing with mouth", "heavy breathing", "labored breathing"
