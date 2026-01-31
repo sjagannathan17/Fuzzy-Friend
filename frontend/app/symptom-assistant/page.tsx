@@ -55,7 +55,7 @@ const getRiskIcon = (riskLevel: RiskLevel) => {
 };
 
 export default function SymptomAssistant() {
-  const [activeTab, setActiveTab] = useState("chat");
+  const [activeTab, setActiveTab] = useState("triage");
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -80,10 +80,10 @@ export default function SymptomAssistant() {
 
   const tabs = [
     { id: "home", icon: Home, label: "Home", href: "/" },
-    { id: "profile", icon: User, label: "Profile", href: "/profile" },
-    { id: "chat", icon: MessageCircle, label: "Chat", href: "/symptom-assistant" },
+    { id: "triage", icon: AlertTriangle, label: "Triage", href: "/symptom-assistant" },
+    { id: "chat", icon: MessageCircle, label: "Chat", href: "/chat" },
     { id: "forum", icon: Users, label: "Forum", href: "/community-forum" },
-    { id: "settings", icon: Settings, label: "Settings", href: "/" },
+    { id: "profile", icon: User, label: "Profile", href: "/profile" },
   ];
 
   // Try to get user location on mount

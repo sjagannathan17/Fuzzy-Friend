@@ -91,31 +91,51 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Quick Symptom Check Card - Overlapping */}
-        <div className="mx-auto max-w-2xl px-4 -mb-20 relative z-20 mt-12">
+        {/* Two Main Options - Overlapping Cards */}
+        <div className="mx-auto max-w-2xl px-4 -mb-20 relative z-20 mt-12 space-y-4">
+          {/* Symptom Checker Card */}
           <div className="bg-white rounded-3xl shadow-xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <h2 className="text-lg font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                  Quick Symptom Check
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2" style={{fontFamily: 'var(--font-poppins)'}}>
+                  🚨 Symptom Checker
                 </h2>
                 <p className="text-sm text-gray-600 font-medium mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
-                  Get urgency guidance in under 2 minutes
+                  Is it an emergency? Get urgency level in 2 minutes
                 </p>
               </div>
-              <span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ml-2">
-                Recommended
+              <span className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ml-2">
+                Triage
               </span>
             </div>
-
-        
-
-            {/* CTA Button */}
             <a
-              href="/onboarding"
-              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-4 rounded-2xl text-center hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95"
+              href="/symptom-assistant"
+              className="block w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-4 rounded-2xl text-center hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95"
             >
-              Get Started
+              Check Symptoms →
+            </a>
+          </div>
+
+          {/* Chat Card */}
+          <div className="bg-white rounded-3xl shadow-xl p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2" style={{fontFamily: 'var(--font-poppins)'}}>
+                  💬 Pet Health Chat
+                </h2>
+                <p className="text-sm text-gray-600 font-medium mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
+                  Ask any question - powered by AI + knowledge base
+                </p>
+              </div>
+              <span className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ml-2">
+                Q&A
+              </span>
+            </div>
+            <a
+              href="/chat"
+              className="block w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-4 rounded-2xl text-center hover:shadow-lg hover:from-purple-600 hover:to-indigo-700 transition-all active:scale-95"
+            >
+              Ask a Question →
             </a>
           </div>
         </div>

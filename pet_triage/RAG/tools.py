@@ -377,12 +377,17 @@ def find_nearby_vets(
             
             vets.append(vet_info)
         
+        # Save all processed vets before filtering
+        all_processed_vets = vets.copy()
+        
         # Sort by distance, emergency clinics first if emergency_only
         if emergency_only:
-            vets = [v for v in vets if v.get("is_emergency_clinic")]
-            if not vets:
-                # No emergency clinics found, return all
-                vets = [v for v in elements[:max_results]]
+            emergency_vets = [v for v in vets if v.get("is_emergency_clinic")]
+            if emergency_vets:
+                vets = emergency_vets
+            else:
+                # No emergency clinics found, return all PROCESSED vets (not raw elements!)
+                vets = all_processed_vets
         
         vets.sort(key=lambda x: (not x.get("is_emergency_clinic", False), x.get("distance_km", 999)))
         vets = vets[:max_results]
