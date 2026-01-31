@@ -27,6 +27,16 @@ structlog>=23.1.0
 ratelimit>=2.2.1
 
 # ============================================
+# API Server Dependencies
+# ============================================
+
+# FastAPI web framework
+fastapi>=0.109.0
+
+# ASGI server for FastAPI
+uvicorn[standard]>=0.27.0
+
+# ============================================
 # Optional: RAG Module Dependencies
 # ============================================
 
