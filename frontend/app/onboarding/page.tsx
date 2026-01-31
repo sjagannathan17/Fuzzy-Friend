@@ -5,9 +5,50 @@ import { useState } from "react";
 import { usePet } from "../../components/PetContext";
 import { useRouter } from "next/navigation";
 
+// Location permission helper
+function requestLocation(setLocation: (loc: GeolocationPosition | null) => void, setError: (err: string) => void) {
+  if (!navigator.geolocation) {
+    setError("Geolocation is not supported by your browser.");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      setLocation(position);
+      setError("");
+      // Save to localStorage for homepage use
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('userLocation', JSON.stringify({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        }));
+      }
+    },
+    (err) => {
+      setError("Location permission denied or unavailable.");
+      setLocation(null);
+    }
+  );
+}
+
 export default function OnboardingPage() {
   const [nameError, setNameError] = useState("");
+  const [ownerNameError, setOwnerNameError] = useState("");
+  const [weightError, setWeightError] = useState("");
+  const [allergiesError, setAllergiesError] = useState("");
+  const [speciesError, setSpeciesError] = useState("");
+  const [ageError, setAgeError] = useState("");
+  const [breedError, setBreedError] = useState("");
+  const [sexError, setSexError] = useState("");
+  const [spayStatusError, setSpayStatusError] = useState("");
+  const [heatCycleError, setHeatCycleError] = useState("");
+  const [vaccinationError, setVaccinationError] = useState("");
+  const [lifestyleError, setLifestyleError] = useState("");
+  const [historyFlagsError, setHistoryFlagsError] = useState("");
   const [localPetName, setLocalPetName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [weight, setWeight] = useState("");
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lb'>("kg");
+  const [allergies, setAllergies] = useState("");
   const { setPetName } = usePet();
   const router = useRouter();
   const [species, setSpecies] = useState<"Dog" | "Cat">("Dog");
@@ -19,6 +60,11 @@ export default function OnboardingPage() {
   const [vaccination, setVaccination] = useState("Fully vaccinated");
   const [lifestyle, setLifestyle] = useState("Indoor only");
   const [historyFlags, setHistoryFlags] = useState<string[]>([]);
+
+  // Location state
+  const [location, setLocation] = useState<GeolocationPosition | null>(null);
+  const [locationError, setLocationError] = useState("");
+  const [locationRequested, setLocationRequested] = useState(false);
 
   const heatCycleVisible = spayStatus === "No" && sex === "Female" && (species === "Dog" || species === "Cat");
 
@@ -35,6 +81,7 @@ export default function OnboardingPage() {
     "History of eating things they shouldn’t",
     "Seizures",
     "Previous emergency vet visit",
+    "None of the above",
   ];
 
   const heatOptions = [
@@ -61,12 +108,110 @@ export default function OnboardingPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    let valid = true;
+    // Owner name
+    if (!ownerName.trim()) {
+      setOwnerNameError("Please enter your name.");
+      valid = false;
+    } else {
+      setOwnerNameError("");
+    }
+    // Pet name
     if (!localPetName.trim()) {
       setNameError("Please enter your pet's name.");
-      return;
+      valid = false;
+    } else {
+      setNameError("");
     }
+    // Weight
+    if (!weight.trim() || isNaN(Number(weight)) || Number(weight) <= 0) {
+      setWeightError("Please enter your pet's weight.");
+      valid = false;
+    } else {
+      setWeightError("");
+    }
+    // Allergies
+    if (!allergies.trim()) {
+      setAllergiesError("Please enter allergies or 'none'.");
+      valid = false;
+    } else {
+      setAllergiesError("");
+    }
+    // Species
+    if (!species) {
+      setSpeciesError("Please select a species.");
+      valid = false;
+    } else {
+      setSpeciesError("");
+    }
+    // Age
+    if (age === undefined || age === null || isNaN(Number(age)) || Number(age) < 0) {
+      setAgeError("Please enter your pet's age.");
+      valid = false;
+    } else {
+      setAgeError("");
+    }
+    // Breed
+    if (!breed.trim()) {
+      setBreedError("Please enter your pet's breed.");
+      valid = false;
+    } else {
+      setBreedError("");
+    }
+    // Sex
+    if (!sex) {
+      setSexError("Please select your pet's sex.");
+      valid = false;
+    } else {
+      setSexError("");
+    }
+    // Spay/Neuter
+    if (!spayStatus) {
+      setSpayStatusError("Please select spay/neuter status.");
+      valid = false;
+    } else {
+      setSpayStatusError("");
+    }
+    // Heat cycle (if visible)
+    if (heatCycleVisible && (!heatCycle || heatCycle === "Unknown")) {
+      setHeatCycleError("Please select last heat cycle.");
+      valid = false;
+    } else {
+      setHeatCycleError("");
+    }
+    // Vaccination
+    if (!vaccination) {
+      setVaccinationError("Please select vaccination status.");
+      valid = false;
+    } else {
+      setVaccinationError("");
+    }
+    // Lifestyle
+    if (!lifestyle) {
+      setLifestyleError("Please select a lifestyle.");
+      valid = false;
+    } else {
+      setLifestyleError("");
+    }
+    // Medical history flags
+    if (!historyFlags.length) {
+      setHistoryFlagsError("Please select at least one medical history flag.");
+      valid = false;
+    } else {
+      setHistoryFlagsError("");
+    }
+    if (!valid) return;
     setPetName(localPetName.trim());
-    setNameError("");
+    if (typeof window !== 'undefined') {
+      if (ownerName.trim()) {
+        localStorage.setItem('ownerName', ownerName.trim());
+      }
+      // Store pet details for profile page
+      localStorage.setItem('petWeight', weight);
+      localStorage.setItem('petWeightUnit', weightUnit);
+      localStorage.setItem('petBreed', breed);
+      localStorage.setItem('petAge', age ? age.toString() : '');
+    }
     router.push("/");
   };
 
@@ -75,7 +220,9 @@ export default function OnboardingPage() {
       <div className="max-w-2xl mx-auto py-6 space-y-6">
         {/* Header */}
         <header className="space-y-1">
-          <h1 className="text-2xl font-bold text-gray-900">Just a few quick questions!</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Let’s learn a bit about your fuzzy friend!
+          </h1>
           <p className="text-sm text-gray-500">
             This will take under 2 minutes.
           </p>
@@ -86,14 +233,73 @@ export default function OnboardingPage() {
           <section className="bg-white rounded-2xl shadow-sm p-5 space-y-4 border border-gray-100">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Pet basics</h2>
-              <p className="text-sm text-gray-500">Tell us a bit about your pet.</p>
+              <p className="text-sm text-gray-500">Tell us a bit about your pet and yourself.</p>
             </div>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-sm font-medium text-gray-900">What is your name? (Pet owner) <span className="text-red-500">*</span></span>
+                <input
+                  type="text"
+                  value={ownerName}
+                  onChange={(e) => setOwnerName(e.target.value)}
+                  placeholder="e.g., Alex Smith"
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+                {ownerNameError && <span className="text-xs text-red-500">{ownerNameError}</span>}
+              </label>
+            </div>
+          </section>
+
+          {/* Location Permission - below pet basics */}
+          <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3 border border-gray-100 mt-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <span className="text-sm font-medium text-gray-900">Enable location to find nearby clinics</span>
+              <div className="flex flex-row sm:flex-col items-center gap-2 sm:gap-2">
+                {/* Video removed */}
+                {/* Toggle switch below video on all screens */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={location ? 'true' : 'false'}
+                  onClick={() => {
+                    if (!location) {
+                      setLocationRequested(true);
+                      requestLocation(setLocation, setLocationError);
+                    } else {
+                      setLocation(null);
+                      setLocationError("");
+                      if (typeof window !== 'undefined') {
+                        localStorage.removeItem('userLocation');
+                      }
+                    }
+                  }}
+                  className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors focus:outline-none ${location ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  style={{ minWidth: 48 }}
+                >
+                  <span className="sr-only">Enable location</span>
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${location ? 'translate-x-6' : 'translate-x-1'}`}
+                  />
+                  <span className="ml-3 text-xs font-semibold text-gray-700 select-none">{location ? 'Yes' : 'No'}</span>
+                </button>
+              </div>
+            </div>
+            {locationRequested && !location && (
+              <span className="text-xs text-red-500">{locationError || 'Waiting for permission...'}</span>
+            )}
+            {location && (
+              <span className="text-xs text-green-600">Location saved!</span>
+            )}
+          </section>
+
+          {/* Pet Details continued */}
+          <section className="bg-white rounded-2xl shadow-sm p-5 space-y-4 border border-gray-100 mt-4">
             <div className="space-y-3">
               <label className="block">
                 <span className="text-sm font-medium text-gray-900">What is your pet's name? <span className="text-red-500">*</span></span>
                 <input
                   type="text"
-                  
+                  value={localPetName}
                   onChange={(e) => setLocalPetName(e.target.value)}
                   placeholder="e.g., Bella"
                   required
@@ -101,8 +307,41 @@ export default function OnboardingPage() {
                 />
                 {nameError && <span className="text-xs text-red-500">{nameError}</span>}
               </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-900">Pet's Weight <span className="text-red-500">*</span></span>
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="number"
+                    min="0"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    placeholder={weightUnit === 'kg' ? 'e.g., 32' : 'e.g., 70'}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                  <select
+                    value={weightUnit}
+                    onChange={e => setWeightUnit(e.target.value as 'kg' | 'lb')}
+                    className="rounded-xl border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="kg">kg</option>
+                    <option value="lb">lb</option>
+                  </select>
+                </div>
+                {weightError && <span className="text-xs text-red-500">{weightError}</span>}
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-900">Allergies (if any) <span className="text-red-500">*</span></span>
+                <input
+                  type="text"
+                  value={allergies}
+                  onChange={(e) => setAllergies(e.target.value)}
+                  placeholder="e.g., Chicken, pollen, none"
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+                {allergiesError && <span className="text-xs text-red-500">{allergiesError}</span>}
+              </label>
             <div className="space-y-1">
-              <span className="text-sm font-medium text-gray-900">Species</span>
+              <span className="text-sm font-medium text-gray-900">Species <span className="text-red-500">*</span></span>
               <div className="grid grid-cols-2 gap-2">
                 {["Dog", "Cat"].map((option) => (
                   <button
@@ -119,10 +358,11 @@ export default function OnboardingPage() {
                   </button>
                 ))}
               </div>
+              {speciesError && <span className="text-xs text-red-500">{speciesError}</span>}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-sm font-medium text-gray-900">Age (years)</span>
+                <span className="text-sm font-medium text-gray-900">Age (years) <span className="text-red-500">*</span></span>
                 <input
                   type="number"
                   min={0}
@@ -130,9 +370,10 @@ export default function OnboardingPage() {
                   onChange={(e) => setAge(Number(e.target.value))}
                   className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 />
+                {ageError && <span className="text-xs text-red-500">{ageError}</span>}
               </label>
               <label className="block">
-                <span className="text-sm font-medium text-gray-900">Breed</span>
+                <span className="text-sm font-medium text-gray-900">Breed <span className="text-red-500">*</span></span>
                 <input
                   type="text"
                   value={breed}
@@ -140,10 +381,11 @@ export default function OnboardingPage() {
                   placeholder="e.g., Labrador"
                   className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 />
+                {breedError && <span className="text-xs text-red-500">{breedError}</span>}
               </label>
             </div>
             <div className="space-y-1">
-              <span className="text-sm font-medium text-gray-900">Sex</span>
+              <span className="text-sm font-medium text-gray-900">Sex <span className="text-red-500">*</span></span>
               <div className="grid grid-cols-3 gap-2">
                 {["Male", "Female", "Unknown"].map((option) => (
                   <button
@@ -160,6 +402,7 @@ export default function OnboardingPage() {
                   </button>
                 ))}
               </div>
+              {sexError && <span className="text-xs text-red-500">{sexError}</span>}
             </div>
           </div>
           </section>
@@ -167,30 +410,29 @@ export default function OnboardingPage() {
         {/* Spay/Neuter + Heat */}
         <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3 border border-gray-100">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Spay/Neuter + Heat cycle</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Spay/Neuter + Heat cycle <span className="text-red-500">*</span></h2>
             <p className="text-sm text-gray-500">Required</p>
           </div>
           <div className="space-y-2">
-          
-              {["Yes", "No", "Unknown"].map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setSpayStatus(option as "Yes" | "No" | "Unknown")}
-                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition shadow-sm ${
-                    spayStatus === option
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 bg-white text-gray-700"
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          
+            {["Yes", "No", "Unknown"].map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setSpayStatus(option as "Yes" | "No" | "Unknown")}
+                className={`rounded-xl border px-3 py-2 text-sm font-semibold transition shadow-sm ${
+                  spayStatus === option
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-gray-200 bg-white text-gray-700"
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+            {spayStatusError && <span className="text-xs text-red-500">{spayStatusError}</span>}
+          </div>
           {heatCycleVisible && (
             <div className="space-y-2">
-              <span className="text-sm font-medium text-gray-900">When was her last heat cycle?</span>
+              <span className="text-sm font-medium text-gray-900">When was her last heat cycle? <span className="text-red-500">*</span></span>
               <div className="relative">
                 <select
                   value={heatCycle}
@@ -203,6 +445,7 @@ export default function OnboardingPage() {
                     </option>
                   ))}
                 </select>
+                {heatCycleError && <span className="text-xs text-red-500">{heatCycleError}</span>}
               </div>
             </div>
           )}
@@ -211,11 +454,10 @@ export default function OnboardingPage() {
         {/* Vaccination Status */}
         <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3 border border-gray-100">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Vaccination status</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Vaccination status <span className="text-red-500">*</span></h2>
             <p className="text-sm text-gray-500">Required</p>
           </div>
           <div className="space-y-2">
-            
             <div className="space-y-2">
               {vaccinationOptions.map((option) => (
                 <label
@@ -233,6 +475,7 @@ export default function OnboardingPage() {
                   <span>{option}</span>
                 </label>
               ))}
+              {vaccinationError && <span className="text-xs text-red-500">{vaccinationError}</span>}
             </div>
           </div>
         </section>
@@ -240,11 +483,10 @@ export default function OnboardingPage() {
         {/* Lifestyle */}
         <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3 border border-gray-100">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Lifestyle / Environment</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Lifestyle / Environment <span className="text-red-500">*</span></h2>
             <p className="text-sm text-gray-500">Required</p>
           </div>
           <div className="space-y-2">
-      
             <div className="space-y-2">
               {lifestyleOptions.map((option) => (
                 <label
@@ -262,6 +504,7 @@ export default function OnboardingPage() {
                   <span>{option}</span>
                 </label>
               ))}
+              {lifestyleError && <span className="text-xs text-red-500">{lifestyleError}</span>}
             </div>
           </div>
         </section>
@@ -269,7 +512,7 @@ export default function OnboardingPage() {
         {/* Medical History Flags */}
         <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3 border border-gray-100">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Medical history flags</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Medical history flags <span className="text-red-500">*</span></h2>
             <p className="text-sm text-gray-500">Required • Select all that apply</p>
           </div>
           <div className="space-y-2">
@@ -288,6 +531,7 @@ export default function OnboardingPage() {
                   <span>{flag}</span>
                 </label>
               ))}
+              {historyFlagsError && <span className="text-xs text-red-500">{historyFlagsError}</span>}
             </div>
             <p className="text-xs text-gray-500">These help us assess risk factors.</p>
           </div>
@@ -301,9 +545,7 @@ export default function OnboardingPage() {
             >
               Let’s begin 🐾
             </button>
-            <p className="text-xs text-gray-500 text-center">
-              This tool does not provide a medical diagnosis.
-            </p>
+          
           </section>
         </form>
 

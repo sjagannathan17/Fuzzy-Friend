@@ -3,15 +3,20 @@
 import { Home, User, MessageCircle, Users, Settings } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
+interface BottomNavProps {
+  onChatClick?: () => void;
+}
+
 const tabs = [
   { id: "home", icon: Home, label: "Home", href: "/" },
   { id: "profile", icon: User, label: "Profile", href: "/profile" },
-  { id: "chat", icon: MessageCircle, label: "Chat", href: "/symptom-assistant" },
+  { id: "chat", icon: MessageCircle, label: "Chat", href: undefined }, // href undefined for chat
   { id: "forum", icon: Users, label: "Forum", href: "/community-forum" },
   { id: "settings", icon: Settings, label: "Settings", href: "/settings" },
 ];
 
-export default function BottomNav() {
+
+export default function BottomNav({ onChatClick }: BottomNavProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -35,11 +40,18 @@ export default function BottomNav() {
       <div className="mx-auto max-w-2xl px-4 flex justify-around items-center">
         {tabs.map((tab) => {
           const Icon = tab.icon;
-          const active = isActive(tab.href);
+          const active = tab.href ? isActive(tab.href) : false;
+          const handleClick = () => {
+            if (tab.id === "chat" && onChatClick) {
+              onChatClick();
+            } else if (tab.href) {
+              router.push(tab.href);
+            }
+          };
           return (
             <button
               key={tab.id}
-              onClick={() => router.push(tab.href)}
+              onClick={handleClick}
               className="flex-1 py-4 px-2 flex flex-col items-center gap-1 transition-all duration-200 group relative"
               title={tab.label}
             >

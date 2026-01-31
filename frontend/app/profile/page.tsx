@@ -1,19 +1,32 @@
 "use client";
-
+import React from "react";
 import { ArrowLeft, Edit2, Plus, Calendar, Heart, ClipboardList, TrendingDown } from "lucide-react";
-
 import Link from "next/link";
+import { usePet } from "../../components/PetContext";
 
 function ProfilePage() {
   const { petName } = usePet();
-  const pet = {
+  // Get pet details from localStorage (set in onboarding)
+  const [petDetails, setPetDetails] = React.useState({
     name: petName && petName !== "your pet" ? petName : "your pet",
-    species: "Golden Retriever",
-    age: "3 years",
     breed: "Golden Retriever",
     weight: "32 kg",
-    avatar: "🐕",
-  };
+    age: "3 years",
+  });
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const breed = localStorage.getItem('petBreed');
+      const weight = localStorage.getItem('petWeight');
+      const age = localStorage.getItem('petAge');
+      setPetDetails((prev) => ({
+        ...prev,
+        breed: breed || prev.breed,
+        weight: weight || prev.weight,
+        age: age || prev.age,
+      }));
+    }
+  }, [petName]);
 
   const medicalHistory = [
     "No Known Allergies",
@@ -52,7 +65,7 @@ function ProfilePage() {
   ];
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
+  <main className="min-h-screen pb-24" style={{ backgroundColor: '#f2dcdd' }}>
       {/* Header */}
       <section className="bg-gradient-to-br from-blue-400 to-blue-500 pt-8 pb-6 px-4 sticky top-0 z-10">
         <div className="mx-auto max-w-2xl flex items-center gap-4">
@@ -69,21 +82,35 @@ function ProfilePage() {
 
       {/* Content */}
       <div className="mx-auto max-w-2xl px-4 mt-8 space-y-8">
-        
-        {/* Pet Profile Card */}
+
+        {/* Video and Pet Profile Card Side by Side */}
         <section>
-          <div className="bg-white rounded-3xl shadow-lg p-6">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-5xl flex-shrink-0">
-                {pet.avatar}
+          <div className="bg-white rounded-3xl shadow-lg p-10 max-w-4xl mx-auto">
+            <div className="flex items-start gap-8 mb-6">
+              {/* Cat video on the left */}
+              <div className="flex flex-col gap-4">
+                <div className="w-48 h-48 rounded-full overflow-hidden shadow-lg flex-shrink-0">
+                  <video
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                  >
+                    <source src="/20620114-hd_1080_1920_50fps.mp4" type="video/mp4" />
+                  </video>
+                </div>
               </div>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.name}
-                </h2>
-                <p className="text-sm text-gray-600 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.species}
-                </p>
+              {/* Pet profile info on the right */}
+              <div className="flex items-start gap-4">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
+                    {petDetails.name}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
+                    {petDetails.breed}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -94,7 +121,7 @@ function ProfilePage() {
                   Age
                 </p>
                 <p className="text-lg font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.age}
+                  {petDetails.age}
                 </p>
               </div>
               <div className="bg-blue-50 rounded-2xl p-4">
@@ -102,7 +129,7 @@ function ProfilePage() {
                   Breed
                 </p>
                 <p className="text-lg font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.breed}
+                  {petDetails.breed}
                 </p>
               </div>
               <div className="bg-blue-50 rounded-2xl p-4">
@@ -110,7 +137,7 @@ function ProfilePage() {
                   Weight
                 </p>
                 <p className="text-lg font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.weight}
+                  {petDetails.weight}
                 </p>
               </div>
               <div className="bg-blue-50 rounded-2xl p-4">
