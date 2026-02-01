@@ -312,9 +312,9 @@ function HomePage() {
                               <div className="flex items-center gap-2">
                                 <h4 className="font-bold text-sm" style={{ fontFamily: 'Poppins, var(--font-poppins)', color: '#2741cc' }}>
                                   <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: '#2741cc' }}>
-                        {clinic.name}
+                      {clinic.name}
                                   </a>
-                      </h4>
+                    </h4>
                                 {clinic.is_24_hour && (
                                   <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-semibold">24hr</span>
                                 )}
@@ -329,7 +329,7 @@ function HomePage() {
                               <div className="text-[10px] text-gray-500 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
                                 {clinic.distance_miles ? `${clinic.distance_miles} mi` : (clinic.distance_km ? `${clinic.distance_km} km` : '')}
                                 {clinic.opening_hours && ` • ${clinic.opening_hours}`}
-                              </div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Star size={14} className="fill-yellow-400 text-yellow-400" />

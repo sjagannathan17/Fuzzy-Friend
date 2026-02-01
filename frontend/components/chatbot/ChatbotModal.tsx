@@ -350,13 +350,13 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
               <div className="text-red-600 text-sm mt-1">Describe symptoms or upload a photo for assessment</div>
             </button>
             
-            <button
+                <button
               onClick={() => selectMode('general')}
               className="w-full bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl p-4 text-left transition"
             >
               <div className="font-bold text-blue-700 text-lg">💬 General Question</div>
               <div className="text-blue-600 text-sm mt-1">Pet care, nutrition, behavior tips</div>
-            </button>
+                </button>
           </div>
         )}
         
@@ -431,39 +431,39 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
                 {images.map((img, idx) => (
                   <div key={idx} className="relative">
                     <img src={img} alt="Preview" className="h-16 w-16 object-cover rounded-lg border" />
-                    <button
+          <button
                       onClick={() => setImages(images.filter((_, i) => i !== idx))}
                       className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                    >
+          >
                       ×
-                    </button>
+          </button>
                   </div>
                 ))}
               </div>
             )}
             
             {/* Camera view */}
-            {cameraOpen && (
+          {cameraOpen && (
               <div className="px-4 pb-2">
                 <div className="relative bg-black rounded-lg overflow-hidden">
                   <video ref={videoRef} autoPlay playsInline className="w-full h-48 object-cover" />
                   <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-2">
-                    <button
-                      onClick={capturePhoto}
+                  <button
+                    onClick={capturePhoto}
                       className="bg-white text-gray-800 rounded-full px-4 py-2 text-sm font-medium"
-                    >
+                  >
                       📸 Capture
-                    </button>
-                    <button
-                      onClick={() => { stopCamera(); setCameraOpen(false); }}
+                  </button>
+                  <button
+                    onClick={() => { stopCamera(); setCameraOpen(false); }}
                       className="bg-gray-800 text-white rounded-full px-4 py-2 text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
+          )}
             
             {/* Input area */}
             <div className="p-4 border-t bg-white">
@@ -492,14 +492,14 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
                   className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                   disabled={isLoading}
                 />
-                <button
+                  <button
                   onClick={() => handleSend()}
                   disabled={isLoading || (!input.trim() && images.length === 0)}
                   className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white rounded-full px-4 py-2 text-sm font-medium transition"
-                >
+                  >
                   Send
-                </button>
-              </div>
+                  </button>
+                </div>
             </div>
           </>
         )}

@@ -1,13 +1,20 @@
 "use client";
 
-import { Home, User, MessageCircle, Users, Settings, Bell, Trash2, ChevronRight } from "lucide-react";
+import { Home, User, MessageCircle, Users, Settings, Bell, Trash2, ChevronRight, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "../../components/AuthContext";
 
 export default function SettingsPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("settings");
+  const { logout, user } = useAuth();
+
+  const handleSignOut = () => {
+    logout();
+    router.push("/auth");
+  };
 
   const tabs = [
     { id: "home", icon: Home, label: "Home", href: "/" },
@@ -110,6 +117,27 @@ export default function SettingsPage() {
               Send us a Message
             </button>
           </div>
+        </div>
+
+        {/* Account Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <User className="w-5 h-5 text-indigo-600" />
+            Account
+          </h2>
+          {user && (
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <p className="text-sm text-gray-600">Signed in as</p>
+              <p className="text-gray-900 font-medium mt-1">{user.email}</p>
+            </div>
+          )}
+          <button 
+            onClick={handleSignOut}
+            className="w-full bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-5 h-5" />
+            Sign Out
+          </button>
         </div>
 
         {/* Delete Data Section */}

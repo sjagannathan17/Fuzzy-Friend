@@ -42,9 +42,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${bubblegumSans.variable} ${poppins.variable} antialiased`}
       >
         <AuthProvider>
-          <PetProvider>
-            {children}
-          </PetProvider>
+        <PetProvider>
+          {children}
+        </PetProvider>
         </AuthProvider>
       </body>
     </html>
