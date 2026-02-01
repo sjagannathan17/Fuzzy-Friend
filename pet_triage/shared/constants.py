@@ -23,7 +23,7 @@ from typing import List
 
 class SymptomCategory(str, Enum):
     """
-    9 supported symptom categories - SINGLE SOURCE OF TRUTH
+    10 supported symptom categories - SINGLE SOURCE OF TRUTH
     All modules MUST use this enum. No synonyms, no variants.
     """
     TOXIC_INGESTION = "Toxic Ingestion & Poisoning"
@@ -35,6 +35,7 @@ class SymptomCategory(str, Enum):
     BREATHING_ISSUES = "Breathing Issues"
     URINARY_GENITAL = "Urinary & Genital"
     SOMETHING_ELSE = "Something Else"
+    GENERAL_QUESTION = "General Question"
     
     @classmethod
     def values(cls) -> List[str]:

@@ -1,18 +1,32 @@
 "use client";
-
+import React from "react";
 import { ArrowLeft, Edit2, Plus, Calendar, Heart, ClipboardList, TrendingDown } from "lucide-react";
 import Link from "next/link";
+import { usePet } from "../../components/PetContext";
 
-export default function ProfilePage() {
-  const pet = {
-    name: "Name",
-    species: "Golden Retriever",
-    age: "3 years",
+function ProfilePage() {
+  const { petName } = usePet();
+  // Get pet details from localStorage (set in onboarding)
+  const [petDetails, setPetDetails] = React.useState({
+    name: petName && petName !== "your pet" ? petName : "your pet",
     breed: "Golden Retriever",
     weight: "32 kg",
-    avatar: "🐕",
-  };
+    age: "3 years",
+  });
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const breed = localStorage.getItem('petBreed');
+      const weight = localStorage.getItem('petWeight');
+      const age = localStorage.getItem('petAge');
+      setPetDetails((prev) => ({
+        ...prev,
+        breed: breed || prev.breed,
+        weight: weight || prev.weight,
+        age: age || prev.age,
+      }));
+    }
+  }, [petName]);
 
   const medicalHistory = [
     "No Known Allergies",
@@ -51,7 +65,7 @@ export default function ProfilePage() {
   ];
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
+  <main className="min-h-screen pb-24" style={{ backgroundColor: '#f2dcdd' }}>
       {/* Header */}
       <section className="bg-gradient-to-br from-blue-400 to-blue-500 pt-8 pb-6 px-4 sticky top-0 z-10">
         <div className="mx-auto max-w-2xl flex items-center gap-4">
@@ -68,21 +82,35 @@ export default function ProfilePage() {
 
       {/* Content */}
       <div className="mx-auto max-w-2xl px-4 mt-8 space-y-8">
-        
-        {/* Pet Profile Card */}
+
+        {/* Video and Pet Profile Card Side by Side */}
         <section>
-          <div className="bg-white rounded-3xl shadow-lg p-6">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-5xl flex-shrink-0">
-                {pet.avatar}
+          <div className="bg-white rounded-3xl shadow-lg p-10 max-w-4xl mx-auto">
+            <div className="flex items-start gap-8 mb-6">
+              {/* Cat video on the left */}
+              <div className="flex flex-col gap-4">
+                <div className="w-48 h-48 rounded-full overflow-hidden shadow-lg flex-shrink-0">
+                  <video
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                  >
+                    <source src="/20620114-hd_1080_1920_50fps.mp4" type="video/mp4" />
+                  </video>
+                </div>
               </div>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.name}
-                </h2>
-                <p className="text-sm text-gray-600 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.species}
-                </p>
+              {/* Pet profile info on the right */}
+              <div className="flex items-start gap-4">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
+                    {petDetails.name}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1" style={{fontFamily: 'var(--font-poppins)'}}>
+                    {petDetails.breed}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -93,7 +121,7 @@ export default function ProfilePage() {
                   Age
                 </p>
                 <p className="text-lg font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.age}
+                  {petDetails.age}
                 </p>
               </div>
               <div className="bg-blue-50 rounded-2xl p-4">
@@ -101,7 +129,7 @@ export default function ProfilePage() {
                   Breed
                 </p>
                 <p className="text-lg font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.breed}
+                  {petDetails.breed}
                 </p>
               </div>
               <div className="bg-blue-50 rounded-2xl p-4">
@@ -109,7 +137,7 @@ export default function ProfilePage() {
                   Weight
                 </p>
                 <p className="text-lg font-bold text-gray-900" style={{fontFamily: 'var(--font-poppins)'}}>
-                  {pet.weight}
+                  {petDetails.weight}
                 </p>
               </div>
               <div className="bg-blue-50 rounded-2xl p-4">
@@ -223,7 +251,63 @@ export default function ProfilePage() {
           </div>
         </section>
       </div>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl">
+        <style>{`
+          @keyframes pop {
+            0% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.4) rotate(-10deg); }
+            100% { transform: scale(1) rotate(0deg); }
+          }
+          .icon-pop:hover {
+            animation: pop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+          }
+        `}</style>
+        <div className="mx-auto max-w-2xl px-4 flex justify-around items-center">
+          {[
+            { id: "home", icon: require("lucide-react").Home, label: "Home", href: "/" },
+            { id: "profile", icon: require("lucide-react").User, label: "Profile", href: "/profile" },
+            { id: "chat", icon: require("lucide-react").MessageCircle, label: "Chat", href: "/symptom-assistant" },
+            { id: "forum", icon: require("lucide-react").Users, label: "Forum", href: "/community-forum" },
+            { id: "settings", icon: require("lucide-react").Settings, label: "Settings", href: "/settings" },
+          ].map((tab) => {
+            const isActive = tab.href === "/profile";
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => window.location.pathname !== tab.href && (window.location.href = tab.href)}
+                className={`flex-1 py-4 px-2 flex flex-col items-center gap-1 transition-all duration-200 group relative`}
+                title={tab.label}
+              >
+                {/* Glow background on hover */}
+                <div className="absolute inset-0 rounded-full bg-blue-100 opacity-0 group-hover:opacity-100 transition-opacity duration-200 -z-10 scale-75"></div>
+
+                <Icon
+                  size={28}
+                  className={`transition-all duration-200 icon-pop ${
+                    isActive
+                      ? "text-blue-600 scale-125"
+                      : "text-gray-600 group-hover:text-blue-500 group-hover:scale-125"
+                  }`}
+                  strokeWidth={isActive ? 2.5 : 2}
+                  fill={isActive ? "currentColor" : "none"}
+                />
+                <span
+                  className={`text-xs font-bold transition-all ${isActive ? "text-blue-600 opacity-100" : "text-gray-600 opacity-0 group-hover:opacity-75"}`}
+                  style={{ fontFamily: "var(--font-poppins)" }}
+                >
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </main>
   );
 }
+
+export default ProfilePage;
 

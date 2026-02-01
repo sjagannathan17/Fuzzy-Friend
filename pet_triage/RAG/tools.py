@@ -356,6 +356,13 @@ def find_nearby_vets(
             # Calculate distance
             distance = _calculate_distance(latitude, longitude, lat, lon)
             
+            # Calculate distance in miles too
+            distance_miles = distance * 0.621371
+            
+            # Get and format opening hours
+            raw_hours = tags.get("opening_hours", "")
+            hours_display = _format_opening_hours(raw_hours)
+            
             vet_info = {
                 "name": tags.get("name", "Veterinary Clinic"),
                 "address": _build_address(tags),
@@ -363,14 +370,19 @@ def find_nearby_vets(
                 "website": tags.get("website") or tags.get("contact:website"),
                 "location": {"lat": lat, "lng": lon},
                 "distance_km": round(distance, 2),
+                "distance_miles": round(distance_miles, 2),
                 "osm_id": element.get("id"),
-                "opening_hours": tags.get("opening_hours"),
-                "is_emergency_clinic": False
+                "opening_hours": hours_display,
+                "is_emergency_clinic": False,
+                "is_24_hour": False
             }
             
-            # Check if it's an emergency clinic
+            # Check if it's an emergency or 24-hour clinic
             name_lower = (tags.get("name") or "").lower()
-            if any(term in name_lower for term in ["emergency", "24", "urgent", "notfall"]):
+            if any(term in name_lower for term in ["emergency", "urgent", "notfall"]):
+                vet_info["is_emergency_clinic"] = True
+            if "24" in name_lower or raw_hours == "24/7":
+                vet_info["is_24_hour"] = True
                 vet_info["is_emergency_clinic"] = True
             if tags.get("emergency") == "yes":
                 vet_info["is_emergency_clinic"] = True
@@ -424,6 +436,30 @@ def _calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     
     return R * c
+
+
+def _format_opening_hours(raw_hours: str) -> str:
+    """Format OSM opening hours into readable format."""
+    if not raw_hours:
+        return "Hours: Call to confirm"
+    
+    # Check for 24/7
+    if raw_hours == "24/7":
+        return "🟢 Open 24/7"
+    
+    # Try to parse common formats
+    raw_hours = raw_hours.strip()
+    
+    # If it looks like OSM format (Mo-Fr 08:00-18:00), try to simplify
+    if "Mo" in raw_hours or "Tu" in raw_hours:
+        # It's in OSM format, return as-is but cleaned up
+        return f"Hours: {raw_hours}"
+    
+    # Default - just return what we have
+    if raw_hours:
+        return f"Hours: {raw_hours}"
+    
+    return "Hours: Call to confirm"
 
 
 def _build_address(tags: dict) -> str:

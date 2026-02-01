@@ -93,9 +93,11 @@ Use the category to prioritize relevant search terms and tailor your response.
   - Use for: medical questions, conditions, treatments, breed info
   - This is your PRIMARY knowledge source
 
-- web_search: Search the web for latest information
-  - Use ONLY when: Need recent research, new treatments, current news
-  - Always prefer vector_search first
+- web_search_tool: Search the web for current information using Google
+  - USE when: Information might have changed recently OR user wants current/updated info
+  - Good for: evolving research, treatment advances, product recommendations, news
+  - NOT needed for: basic anatomy, established conditions, breed characteristics
+  - When in doubt about currency of information, use web search to supplement RAG
 
 ### Emergency & Safety
 - check_red_flags: Check symptoms for emergency indicators (rule-based)
@@ -128,7 +130,8 @@ Use the category to prioritize relevant search terms and tailor your response.
 - Are there SYMPTOMS? -> Use check_red_flags FIRST
 - Is there a SYMPTOM CATEGORY? -> Use it to refine your searches
 - Is it a MEDICAL QUESTION? -> Use vector_search
-- Need LATEST INFO? -> Use web_search (after vector_search)
+- Could info be outdated or evolving? -> Also use web_search_tool
+- Asking about treatments, research, or recommendations? -> Consider web_search_tool
 
 ### Step 2: Check Risk Level
 - If ER -> find_nearby_vets immediately (emergency)
@@ -145,7 +148,10 @@ Use the category to prioritize relevant search terms and tailor your response.
 
 1. Safety First: ALWAYS check_red_flags for symptoms before giving advice
 2. Use Images: ALWAYS analyze_image when image is provided
-3. Prefer Database: Use vector_search before web_search
+3. Knowledge Sources: 
+   - Use vector_search for medical knowledge
+   - ALSO use web_search_tool for: treatments, medications, products, research, diet recommendations
+   - Treatments and research evolve - web search provides current info
 4. Leverage Category: Use symptom category to focus analysis
 5. Be Direct: For emergencies, immediately find vets
 6. Cite Sources: Mention which tool provided information
@@ -168,10 +174,24 @@ Remember: You can use multiple tools in sequence. Think step-by-step and choose 
 # These wrap existing functions into LangChain Tool format
 
 def _vector_search_wrapper(query: str) -> str:
-    """Search the pet health knowledge database."""
+    """Search the pet health knowledge database and return answer with sources."""
     try:
-        answer = ask_simple(query)
-        return f"Knowledge Database Result:\n{answer}"
+        from rag_chain import ask
+        answer, sources = ask(query)
+        
+        result = f"Knowledge Database Result:\n{answer}\n"
+        
+        if sources:
+            result += f"\n📚 Sources ({len(sources)} documents):\n"
+            for i, src in enumerate(sources[:3], 1):  # Show top 3 sources
+                # Extract source info
+                if hasattr(src, 'metadata'):
+                    title = src.metadata.get('title', src.metadata.get('source', f'Document {i}'))
+                    result += f"  {i}. {title}\n"
+                else:
+                    result += f"  {i}. Source document {i}\n"
+        
+        return result
     except Exception as e:
         return f"Error searching database: {str(e)}"
 
@@ -424,10 +444,13 @@ def emergency_triage(input_str: str) -> str:
 
 @tool
 def web_search_tool(query: str) -> str:
-    """Search the web for latest pet health information using Gemini + Google Search.
-    Use ONLY when you need recent research, new treatments, or current news.
-    ALWAYS try vector_search first before using web search.
-    Input: a specific search query about recent pet health topics.
+    """Search the web for current pet health information using Google Search.
+    Use when:
+    - Information could be outdated or evolving (treatments, research, products)
+    - User wants current recommendations or comparisons
+    - RAG results seem incomplete or you want to supplement with fresh data
+    NOT needed for: basic breed info, anatomy, well-established conditions.
+    Input: a specific search query about pet health topics.
     """
     return _web_search_wrapper(query)
 
@@ -507,7 +530,7 @@ class PetHealthAgent:
 
     def __init__(
         self,
-        model: str = "gpt-4-turbo-preview",
+        model: str = "gpt-4o",  # Better instruction following
         temperature: float = 0.7,
         max_iterations: int = 10,
         verbose: bool = True
@@ -642,35 +665,53 @@ TRIAGE_AGENT_SYSTEM_PROMPT = """You are a Pet Health Triage Agent. Your job is t
 
 ## CRITICAL WORKFLOW - FOLLOW EXACTLY
 
-### Step 1: ALWAYS Check Emergency First
-Before any other action, use the `check_red_flags` tool with a JSON string containing ALL available information.
+### Step 1: ANALYZE IMAGE FIRST (if provided)
+If an image is provided, use `analyze_image` FIRST before anything else.
+
+⚠️ CRITICAL: If the image shows ANY of these, it's an IMMEDIATE EMERGENCY (ER):
+- Blood (anywhere on the pet)
+- Open wounds or lacerations
+- Visible injuries or trauma
+- Pale/white/blue gums
+- Unconscious or collapsed pet
+- Difficulty breathing
+- Swelling/distended abdomen
+
+If image shows emergency signs → use `get_er_template` IMMEDIATELY → DO NOT ask follow-up questions!
+
+### Step 2: Check Red Flags
+Use the `check_red_flags` tool with a JSON string containing ALL available information.
 
 IMPORTANT: You MUST pass a JSON string to check_red_flags, NOT plain text!
 Example format:
-{"symptoms": "vomiting, lethargy", "species": "dog", "breed": "Great Dane", "category": "Stomach Upset", "structured_fields": {"abdomen_distended": "Yes", "unproductive_retching": "Yes"}}
+{"symptoms": "vomiting, lethargy", "species": "dog", "breed": "Great Dane", "category": "Stomach Upset", "structured_fields": {}}
 
 If the result shows `IS_EMERGENCY: True` or `ACTION: RETURN_ER_TEMPLATE`:
 → IMMEDIATELY use `get_er_template` tool with the category
+→ DO NOT use request_followup for emergencies
 → Return the ER template as your final response
-→ DO NOT continue with other tools
 
-### Step 2: Check for Missing Information
-If critical information is missing (duration, severity, key symptoms):
-→ Use `request_followup` tool to generate follow-up questions
-→ Return the follow-up response
-
-### Step 3: Gather Additional Context (if needed)
-- If IMAGE is provided → use `analyze_image`
+### Step 3: Non-Emergency Assessment
+Only if NOT an emergency:
+- If critical information is missing → use `request_followup` (NEVER use this for emergencies!)
 - If you need medical knowledge → use `vector_search`
 - If location is provided AND urgent → use `find_nearby_vets`
 
 ### Step 4: Generate Final Response
 Use `generate_triage_response` tool with:
 - risk_level: "ER" | "TODAY" | "SOON" | "MONITOR"
-- category: the symptom category
+- category: the symptom category (infer from symptoms if "Something Else")
 - reasoning: list of reasons for this risk level
 - actions: list of recommended actions
 - monitoring: what to watch for
+
+## NEVER ASK FOLLOW-UP QUESTIONS FOR:
+- Blood visible on pet
+- Any bleeding or wounds
+- Trauma or injury
+- Difficulty breathing
+- Unconscious/collapsed pet
+- These are ALL emergencies - use get_er_template immediately!
 
 ## Risk Level Definitions
 - ER: Life-threatening, go to emergency vet NOW
@@ -690,6 +731,7 @@ Use `generate_triage_response` tool with:
 - get_er_template: Get ER response template (use if emergency)
 - request_followup: Generate follow-up questions (if info missing)
 - vector_search: Search medical knowledge base
+- web_search_tool: Search web for current treatments, research, products (use for evolving topics)
 - analyze_image: Analyze pet photos
 - find_nearby_vets: Find veterinary clinics
 - generate_triage_response: Format final response (ALWAYS USE LAST)
@@ -723,7 +765,7 @@ class PetTriageAgent:
 
     def __init__(
         self,
-        model: str = "gpt-4-turbo-preview",
+        model: str = "gpt-4o",  # Better instruction following
         temperature: float = 0.3,  # Lower for consistent triage
         max_iterations: int = 8,
         verbose: bool = True
@@ -802,7 +844,9 @@ class PetTriageAgent:
             "triage_response": None,
             "tools_used": [],
             "is_emergency": False,
-            "raw_output": ""
+            "raw_output": "",
+            "rag_source_count": 0,
+            "used_web_search": False
         }
 
         # Build the input message for the agent
@@ -823,18 +867,72 @@ class PetTriageAgent:
             fields_str = json.dumps(structured_fields, ensure_ascii=False)
             input_parts.append(f"Structured Fields (from UI form): {fields_str}")
 
-        if image_path:
-            input_parts.append(f"Image provided: {image_path}")
+        # Pre-analyze image if provided and add results to input
+        image_analysis_result = None
+        if image_path or image_base64:
+            try:
+                image_source = image_path
+                if image_base64 and not image_path:
+                    # Save base64 to temp file
+                    import tempfile
+                    import base64
+                    image_data = base64.b64decode(image_base64)
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as f:
+                        f.write(image_data)
+                        image_source = f.name
+                
+                from image_analyzer import analyze_pet_image
+                image_analysis_result = analyze_pet_image(image_source, user_question=user_description)
+                image_desc = image_analysis_result.get("description", "")
+                
+                # Add image analysis to input - make it VERY clear if emergency
+                input_parts.append("")
+                input_parts.append("=== IMAGE ANALYSIS RESULTS ===")
+                input_parts.append(image_desc)
+                input_parts.append("=== END IMAGE ANALYSIS ===")
+                
+                # Check for emergency keywords in image analysis
+                image_lower = image_desc.lower()
+                emergency_in_image = any(kw in image_lower for kw in 
+                    ["blood", "bleeding", "wound", "injury", "trauma", "laceration", 
+                     "emergency", "er", "immediate", "urgent", "severe"])
+                
+                if emergency_in_image:
+                    input_parts.append("")
+                    input_parts.append("⚠️ CRITICAL: Image shows BLOOD/INJURY - this is an EMERGENCY!")
+                    input_parts.append("→ You MUST use get_er_template tool immediately!")
+                    input_parts.append("→ Do NOT ask follow-up questions!")
+                    input_parts.append("→ Do NOT use request_followup!")
+                    result["is_emergency"] = True  # Mark as emergency from image
+                
+                # Track image analysis as a tool used
+                result["tools_used"].append({
+                    "tool": "analyze_image",
+                    "input": "pre-analysis of uploaded image"
+                })
+                    
+                # Clean up temp file if created
+                if image_base64 and not image_path and image_source:
+                    import os
+                    try:
+                        os.unlink(image_source)
+                    except:
+                        pass
+                        
+            except Exception as e:
+                input_parts.append(f"Image analysis failed: {str(e)}")
 
         if latitude and longitude:
             input_parts.append(f"Location: {latitude},{longitude}")
 
         # Add instruction
         input_parts.append("")
-        input_parts.append("Please perform triage assessment following the workflow:")
-        input_parts.append("1. First check for emergencies using check_red_flags")
-        input_parts.append("2. If emergency, use get_er_template and return immediately")
-        input_parts.append("3. Otherwise, gather context and use generate_triage_response")
+        input_parts.append("=== INSTRUCTIONS ===")
+        input_parts.append("1. If image shows blood/injury/emergency → use get_er_template IMMEDIATELY")
+        input_parts.append("2. Check for emergencies using check_red_flags")
+        input_parts.append("3. If emergency, use get_er_template and return immediately")
+        input_parts.append("4. NEVER use request_followup for blood, injuries, or emergencies")
+        input_parts.append("5. Otherwise, use generate_triage_response")
 
         full_input = "\n".join(input_parts)
 
@@ -884,6 +982,24 @@ class PetTriageAgent:
                                 print(f"  Found triage response in tool output: risk_level={parsed.get('risk_level')}")
                     except json.JSONDecodeError:
                         continue
+
+            # Extract source count from vector_search tool output
+            rag_source_count = 0
+            used_web_search = False
+            for msg in output_messages:
+                if 'ToolMessage' in type(msg).__name__ and msg.content:
+                    content = msg.content
+                    # Check for RAG sources pattern: "📚 Sources (X documents)"
+                    import re
+                    source_match = re.search(r'Sources \((\d+) documents\)', content)
+                    if source_match:
+                        rag_source_count = int(source_match.group(1))
+                    # Check if web search was used
+                    if 'Web Search Result' in content or 'search results' in content.lower():
+                        used_web_search = True
+            
+            result["rag_source_count"] = rag_source_count
+            result["used_web_search"] = used_web_search
 
             if triage_response:
                 result["triage_response"] = triage_response

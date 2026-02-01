@@ -108,7 +108,7 @@ export default function CommunityForum() {
     : posts;
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
+  <main className="min-h-screen pb-24" style={{ backgroundColor: '#f2dcdd' }}>
       {/* Header */}
       <header className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 pt-6 pb-8 shadow-lg">
         <div className="max-w-2xl mx-auto">
@@ -121,7 +121,7 @@ export default function CommunityForum() {
               <ArrowLeft size={24} />
             </button>
             <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-poppins)" }}>
-              👥 Pet Owner Community
+              Fuzzy Community
             </h1>
           </div>
           <p className="text-blue-100 text-sm ml-12">Learn from other pet owners and share your experiences</p>

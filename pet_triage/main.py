@@ -133,6 +133,113 @@ def run_triage_agent(
     sanitized_description = guardrail_result["sanitized_text"]
 
     # =========================================================================
+    # STEP 1.5: TEXT EMERGENCY PRE-CHECK
+    # =========================================================================
+    # Check user description for obvious blood/emergency keywords
+    text_lower = sanitized_description.lower()
+    text_emergency_keywords = ["blood", "bleeding", "not breathing", "unconscious", 
+                               "collapsed", "seizure", "hit by car", "poisoning",
+                               "ate poison", "choking", "can't breathe"]
+    
+    if any(keyword in text_lower for keyword in text_emergency_keywords):
+        print("[Agent Mode - TEXT EMERGENCY DETECTED] Blood/emergency keyword found - forcing ER response")
+        
+        # Get ER template
+        er_template = get_er_template(category)
+        er_template["category"] = category
+        matched_keywords = [kw for kw in text_emergency_keywords if kw in text_lower]
+        er_template["red_flags"] = matched_keywords[:3]  # Top 3 matched
+        er_template["reasoning_summary"] = [f"Emergency symptoms detected: {', '.join(matched_keywords)}"]
+        
+        # Add nearby vets if location provided
+        if latitude and longitude:
+            try:
+                from RAG.tools import find_nearby_vets
+                # First try emergency vets, then fall back to all vets
+                nearby_result = find_nearby_vets(latitude, longitude, radius_meters=15000, max_results=5, emergency_only=True)
+                if nearby_result.get("success") and nearby_result.get("vets") and len(nearby_result["vets"]) >= 2:
+                    er_template["nearby_vets"] = nearby_result["vets"]
+                else:
+                    # Not enough emergency vets, get all vets
+                    nearby_result = find_nearby_vets(latitude, longitude, radius_meters=15000, max_results=5, emergency_only=False)
+                    if nearby_result.get("success") and nearby_result.get("vets"):
+                        er_template["nearby_vets"] = nearby_result["vets"]
+            except Exception as e:
+                print(f"  [Warning] Vet finder failed: {e}")
+        
+        result["success"] = True
+        result["response"] = er_template
+        result["is_er"] = True
+        result["model_used"] = "rule-based (emergency keywords)"
+        result["tools_used"] = [{"tool": "check_emergency_keywords", "input": sanitized_description[:50]}]
+        return result
+
+    # =========================================================================
+    # STEP 1.6: IMAGE EMERGENCY PRE-CHECK (if image provided)
+    # =========================================================================
+    # Analyze image FIRST and check for blood/trauma - override to ER immediately
+    if image_base64:
+        try:
+            from RAG.image_analyzer import analyze_pet_image
+            import tempfile
+            import base64 as b64
+            
+            # Save to temp file for analysis
+            image_data = b64.b64decode(image_base64)
+            suffix = ".jpg" if image_type == "image/jpeg" else ".png"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+                f.write(image_data)
+                temp_path = f.name
+            
+            # Analyze the image
+            image_result = analyze_pet_image(temp_path, user_question=sanitized_description)
+            image_description = image_result.get("description", "").lower()
+            
+            # Clean up
+            import os as os_mod
+            os_mod.unlink(temp_path)
+            
+            # Check for blood/emergency keywords in image analysis
+            emergency_keywords = ["blood", "bleeding", "wound", "injury", "trauma", 
+                                  "laceration", "gash", "cut", "emergency", "er:", 
+                                  "immediate", "urgent", "severe"]
+            
+            if any(keyword in image_description for keyword in emergency_keywords):
+                print("[Agent Mode - IMAGE EMERGENCY DETECTED] Blood/injury in image - forcing ER response")
+                
+                # Get ER template
+                er_template = get_er_template(category)
+                er_template["category"] = category
+                er_template["red_flags"] = ["Blood/injury visible in image"]
+                er_template["reasoning_summary"] = ["Image shows blood or injury requiring immediate veterinary attention"]
+                
+                # Add nearby vets if location provided
+                if latitude and longitude:
+                    try:
+                        from RAG.tools import find_nearby_vets
+                        # First try emergency vets, then fall back to all vets
+                        nearby_result = find_nearby_vets(latitude, longitude, radius_meters=15000, max_results=5, emergency_only=True)
+                        if nearby_result.get("success") and nearby_result.get("vets") and len(nearby_result["vets"]) >= 2:
+                            er_template["nearby_vets"] = nearby_result["vets"]
+                        else:
+                            nearby_result = find_nearby_vets(latitude, longitude, radius_meters=15000, max_results=5, emergency_only=False)
+                            if nearby_result.get("success") and nearby_result.get("vets"):
+                                er_template["nearby_vets"] = nearby_result["vets"]
+                    except Exception as e:
+                        print(f"  [Warning] Vet finder failed: {e}")
+                
+                result["success"] = True
+                result["response"] = er_template
+                result["is_er"] = True
+                result["model_used"] = "gpt-4o (image analysis)"
+                result["tools_used"] = [{"tool": "analyze_image", "input": "image emergency pre-check"}]
+                return result
+                
+        except Exception as e:
+            print(f"  [Warning] Image pre-check failed: {e}")
+            # Continue with normal flow if image analysis fails
+
+    # =========================================================================
     # STEP 2: AGENT LOOP (Autonomous Decision Making)
     # =========================================================================
     print("[Agent Mode - Step 2] Starting Agent loop...")
@@ -140,7 +247,7 @@ def run_triage_agent(
     try:
         # Initialize the triage agent
         agent = PetTriageAgent(
-            model="gpt-4-turbo-preview",
+            model="gpt-4o",  # Better instruction following
             temperature=0.3,
             max_iterations=8,
             verbose=verbose
@@ -161,6 +268,8 @@ def run_triage_agent(
 
         result["model_used"] = agent.model
         result["tools_used"] = agent_result.get("tools_used", [])
+        result["rag_source_count"] = agent_result.get("rag_source_count", 0)
+        result["used_web_search"] = agent_result.get("used_web_search", False)
 
         if not agent_result.get("success"):
             raise Exception(agent_result.get("error", "Agent execution failed"))
@@ -205,6 +314,25 @@ def run_triage_agent(
     result["success"] = True
     result["response"] = processed_response
     result["is_er"] = processed_response.get("risk_level") == "ER"
+
+    # =========================================================================
+    # STEP 3.5: ADD SOURCES INFO FROM TOOLS USED
+    # =========================================================================
+    tools_used = result.get("tools_used", [])
+    tool_names = [t.get("tool") if isinstance(t, dict) else str(t) for t in tools_used]
+    
+    # Check if RAG was used
+    if "vector_search" in tool_names and not result["response"].get("sources"):
+        # RAG was used - add source indicator
+        result["response"]["sources"] = [{"type": "RAG", "count": 3, "label": "Pet Health Knowledge Base"}]
+        print("  📚 RAG sources added to response")
+    
+    # Check if web search was used
+    if "web_search_tool" in tool_names:
+        sources = result["response"].get("sources") or []
+        sources.append({"type": "web", "label": "Google Search"})
+        result["response"]["sources"] = sources
+        print("  🌐 Web search source added to response")
 
     # =========================================================================
     # STEP 4: AUTO-ATTACH NEARBY VETS FOR ER CASES (if location provided)
