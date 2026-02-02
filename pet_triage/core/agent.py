@@ -29,7 +29,7 @@ load_dotenv()
 # LangChain imports (updated for LangChain 1.2.x / LangGraph)
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langgraph.prebuilt import create_react_agent
 
 # Import existing tools (NO modifications to original files!)
@@ -156,6 +156,22 @@ Use the category to prioritize relevant search terms and tailor your response.
 5. Be Direct: For emergencies, immediately find vets
 6. Cite Sources: Mention which tool provided information
 7. Know Limits: You're not a veterinarian - recommend professional care when appropriate
+
+## SCOPE RESTRICTIONS (CRITICAL)
+
+8. ONLY Dogs and Cats: You can ONLY answer questions about dogs and cats. 
+   - If the user asks about OTHER animals (birds, reptiles, hamsters, horses, fish, etc.), politely respond:
+     "I'm sorry, I can only help with dogs and cats at this time. For [animal type] health concerns, please consult a veterinarian who specializes in exotic or [animal type] care."
+   - If the user asks about NON-PET topics (weather, cooking, math, general knowledge, etc.), respond:
+     "I'm a pet health assistant specialized in dogs and cats. I can only help with pet health-related questions. How can I help with your dog or cat today?"
+
+9. Image-Only Requests: When the user provides ONLY an image with no text description:
+   - FIRST analyze the image using analyze_image
+   - THEN ask 1-2 brief follow-up questions to better understand the concern, such as:
+     - "I can see your pet in the image. What specific concern would you like me to help with?"
+     - "When did you first notice this issue?"
+     - "Is your pet showing any other symptoms?"
+   - Do NOT provide a full assessment until you understand what the user is worried about
 
 ## Response Style
 - Acknowledge the symptom category if provided
@@ -583,7 +599,6 @@ class PetHealthAgent:
         """
         # Re-hydrate history if provided
         if history:
-            from langchain_core.messages import HumanMessage, AIMessage
             for msg in history:
                 if msg.get("role") == "user":
                     self.chat_history.append(HumanMessage(content=msg.get("content", "")))
@@ -628,7 +643,6 @@ class PetHealthAgent:
         # Update history
         self.chat_history.append(HumanMessage(content=user_input))
         if final_output:
-            from langchain_core.messages import AIMessage
             self.chat_history.append(AIMessage(content=final_output))
 
         return {
@@ -753,6 +767,18 @@ Use `generate_triage_response` tool with:
 - analyze_image: Analyze pet photos
 - find_nearby_vets: Find veterinary clinics
 - generate_triage_response: Format final response (ALWAYS USE LAST)
+
+## SCOPE RESTRICTIONS (CRITICAL)
+
+6. ONLY Dogs and Cats: You can ONLY assess dogs and cats.
+   - If species is NOT dog or cat, respond with an error message explaining you only support dogs and cats.
+   - Never attempt to triage other animals (birds, reptiles, horses, fish, etc.)
+
+7. Image-Only Requests: When the user provides ONLY an image with no symptom description:
+   - FIRST analyze the image using analyze_image to check for emergencies
+   - If emergency signs detected (blood, wounds, distress) → use get_er_template immediately
+   - If NO emergency signs → use request_followup to ask what specific concern they have
+   - Example: "I can see your pet in the image. What specific symptom or concern brought you to us today?"
 """
 
 
