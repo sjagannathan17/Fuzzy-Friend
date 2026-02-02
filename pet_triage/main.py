@@ -133,6 +133,7 @@ def run_triage_agent(
     result["warnings"] = guardrail_result["warnings"]
     sanitized_description = guardrail_result["sanitized_text"]
 
+
     # =========================================================================
     # STEP 1.5: TEXT EMERGENCY PRE-CHECK
     # =========================================================================
@@ -140,9 +141,11 @@ def run_triage_agent(
     text_lower = sanitized_description.lower()
     text_emergency_keywords = ["blood", "bleeding", "not breathing", "unconscious", 
                                "collapsed", "seizure", "hit by car", "poisoning",
-                               "ate poison", "choking", "can't breathe"]
+                               "ate poison", "choking", "can't breathe", "cant breathe",
+                               "blue gums", "pale gums", "white gums", "purple gums"]
     
     if any(keyword in text_lower for keyword in text_emergency_keywords):
+
         print("[Agent Mode - TEXT EMERGENCY DETECTED] Blood/emergency keyword found - forcing ER response")
         
         # Get ER template
@@ -360,114 +363,6 @@ def run_triage_agent(
             result["warnings"].append(f"Failed to find nearby vets: {str(e)}")
 
     return result
-
-
-# ============================================================================
-# Main Triage Function (Wrapper for Agent Mode)
-# ============================================================================
-
-def run_triage_agent(
-    species: str,
-    category: str,
-    structured_fields: Dict[str, Any],
-    user_description: str = "",
-    pet_profile: Dict[str, Any] = None,
-    image_base64: str = None,
-    image_type: str = None,
-    image_path: str = None,
-    latitude: float = None,
-    longitude: float = None,
-    triage_history: List[Dict[str, Any]] = None,  # New
-    verbose: bool = True
-) -> Dict[str, Any]:
-    """
-    Agent-based triage function with autonomous tool selection.
-    """
-    # ... (docstring updates omitted for brevity, but functionality is key) ...
-
-    # Import agent here to avoid circular imports
-    from core.agent import PetTriageAgent
-
-    result = {
-        "success": False,
-        "response": None,
-        "error": None,
-        "warnings": [],
-        "is_er": False,
-        "model_used": None,
-        "tools_used": [],
-        "mode": "agent"
-    }
-
-    # =========================================================================
-    # STEP 1: INPUT GUARDRAILS (Mandatory - runs before Agent)
-    # =========================================================================
-    print("\n[Agent Mode - Step 1] Running input guardrails...")
-
-    # ... (guardrails code remains same) ...
-
-    image_size = len(image_base64) if image_base64 else None
-
-    guardrail_result = input_guardrails.validate_all(
-        species=species,
-        category=category,
-        structured_fields=structured_fields,
-        user_description=user_description,
-        image_size=image_size,
-        image_type=image_type
-    )
-
-    if not guardrail_result["passed"]:
-        result["error"] = guardrail_result["error"]
-        return result
-
-    result["warnings"] = guardrail_result["warnings"]
-    sanitized_description = guardrail_result["sanitized_text"]
-
-    # =========================================================================
-    # STEP 1.5: TEXT EMERGENCY PRE-CHECK
-    # =========================================================================
-    # ... (emergency check code remains same) ...
-    text_lower = sanitized_description.lower()
-    text_emergency_keywords = ["blood", "bleeding", "not breathing", "unconscious", 
-                               "collapsed", "seizure", "hit by car", "poisoning",
-                               "ate poison", "choking", "can't breathe"]
-    
-    if any(keyword in text_lower for keyword in text_emergency_keywords):
-        # ... (handling code) ...
-        pass # Placeholder for existing logic
-
-    # =========================================================================
-    # STEP 2: RUN AGENT
-    # =========================================================================
-    # Initialize Agent
-    agent = PetTriageAgent(
-        model="gpt-4o",  # Use strong model for reasoning
-        temperature=0.3,
-        verbose=verbose
-    )
-
-    # Run Agent
-    # We pass everything as structured input to the agent's triage() method
-    print("[Agent Mode - Step 2] Starting Agent loop...")
-    agent_result = agent.triage(
-        species=species,
-        category=category,
-        structured_fields=structured_fields,
-        user_description=sanitized_description,
-        pet_profile=pet_profile,
-        image_base64=image_base64, # Pass base64 if needed by agent internally? Current code passed image_path
-        image_path=image_path,
-        latitude=latitude,
-        longitude=longitude,
-        triage_history=triage_history  # Pass history
-    )
-    
-    # ... (rest of function) ...
-    # This replacement is tricky because I can't match huge block perfectly.
-    # I should use multi_replace or specific target blocks.
-    # I will stick to signature update of run_triage first, then run_triage_agent.
-    pass
 
 # Redoing with better targeting. I will update `run_triage` signature first.
 def run_triage(

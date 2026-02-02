@@ -58,18 +58,16 @@ export default function BottomNav({ onChatClick }: BottomNavProps) {
               <div className="absolute inset-0 rounded-full bg-blue-100 opacity-0 group-hover:opacity-100 transition-opacity duration-200 -z-10 scale-75"></div>
               <Icon
                 size={28}
-                className={`transition-all duration-200 icon-pop ${
-                  active
+                className={`transition-all duration-200 icon-pop ${active
                     ? "text-blue-600 scale-125"
                     : "text-gray-600 group-hover:text-blue-500 group-hover:scale-125"
-                }`}
+                  }`}
                 strokeWidth={active ? 2.5 : 2}
                 fill={active ? "currentColor" : "none"}
               />
               <span
-                className={`text-xs font-bold transition-all ${
-                  active ? "text-blue-600 opacity-100" : "text-gray-600 opacity-0 group-hover:opacity-75"
-                }`}
+                className={`text-xs font-bold transition-all ${active ? "text-blue-600 opacity-100" : "text-gray-600 opacity-0 group-hover:opacity-75"
+                  }`}
                 style={{ fontFamily: "var(--font-poppins)" }}
               >
                 {tab.label}

@@ -81,15 +81,28 @@ genai_group_project/
 ### Prerequisites
 - Node.js and npm
 - Python 3.10+
-- OpenAI API Key
+- OpenAI API Key (set in `.env` file)
 
-### Installation
+### Quick Start (One Command)
+
+```bash
+# Mac/Linux
+./start.sh
+
+# Or run manually:
+# Terminal 1: cd pet_triage && uvicorn api:app --port 8000
+# Terminal 2: cd frontend && npm run dev
+```
+
+Then open http://localhost:3000 in your browser.
+
+### Manual Installation
 
 1. **Backend Setup**:
     ```bash
     cd pet_triage
     pip install -r requirements.txt
-    python -m uvicorn api:app --host 0.0.0.0 --port 8000
+    uvicorn api:app --host 0.0.0.0 --port 8000
     ```
 
 2. **Frontend Setup**:
@@ -100,6 +113,7 @@ genai_group_project/
     ```
 
 3. Access the app at `http://localhost:3000`.
+
 
 ---
 
