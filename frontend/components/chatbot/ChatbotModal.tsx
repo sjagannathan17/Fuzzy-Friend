@@ -245,6 +245,14 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
 
           botResponse = `**${riskStyle.label}**\n\n`;
 
+          if (result.category) {
+            botResponse += `**📋 Category:** ${result.category}\n\n`;
+          }
+
+          if (result.reasoning_summary && result.reasoning_summary.length > 0) {
+            botResponse += `**💡 Why:**\n${result.reasoning_summary.map((r: string) => `• ${r}`).join('\n')}\n\n`;
+          }
+
           if (result.red_flags && result.red_flags.length > 0) {
             botResponse += `**⚠️ Red Flags:**\n${result.red_flags.map((f: string) => `• ${f}`).join('\n')}\n\n`;
           }
