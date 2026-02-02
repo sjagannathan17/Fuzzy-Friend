@@ -29,7 +29,20 @@ interface ChatbotModalProps {
   petName?: string;
 }
 
-type ChatMode = 'select' | 'symptom' | 'general';
+type ChatMode = 'select' | 'category' | 'symptom' | 'general';
+
+// Symptom categories with icons
+const SYMPTOM_CATEGORIES = [
+  { id: 'Toxic Ingestion & Poisoning', label: 'Poisoning / Toxic', icon: '☠️' },
+  { id: 'Stomach Upset', label: 'Stomach Issues', icon: '🤢' },
+  { id: 'Itching & Skin Issues', label: 'Skin & Itching', icon: '🔴' },
+  { id: 'Injury & Bleeding', label: 'Injury / Bleeding', icon: '🩹' },
+  { id: 'Concerning Behaviour Changes', label: 'Behavior Changes', icon: '😰' },
+  { id: 'Ears, Eyes, and Mouth', label: 'Eyes / Ears / Mouth', icon: '👁️' },
+  { id: 'Breathing Issues', label: 'Breathing Problems', icon: '😮‍💨' },
+  { id: 'Urinary & Genital', label: 'Urinary Issues', icon: '💧' },
+  { id: 'Something Else', label: 'Other Symptoms', icon: '❓' },
+];
 
 // Suggested prompts for symptom checker
 const SYMPTOM_SUGGESTIONS = [
@@ -67,6 +80,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
   type ChatMessage = { type: string; text: string; image?: string; riskLevel?: string };
 
   const [mode, setMode] = useState<ChatMode>('select');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [images, setImages] = useState<string[]>([]);
@@ -91,6 +105,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
   useEffect(() => {
     if (open) {
       setMode('select');
+      setSelectedCategory('');
       setMessages([]);
       setInput("");
       setImages([]);
@@ -125,20 +140,27 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
   };
 
   const selectMode = (selectedMode: 'symptom' | 'general') => {
-    setMode(selectedMode);
-    const petDisplayName = petName && petName !== "your pet" ? petName : "your pet";
-
     if (selectedMode === 'symptom') {
-      setMessages([{
-        type: "bot",
-        text: `Hi${ownerName ? ` ${ownerName}` : ""}! Describe ${petDisplayName}'s symptoms or upload a photo for a quick assessment.`
-      }]);
+      // Go to category selection first
+      setMode('category');
     } else {
+      setMode(selectedMode);
       setMessages([{
         type: "bot",
         text: `Hi${ownerName ? ` ${ownerName}` : ""}! What would you like to know about pet care? Ask me anything!`
       }]);
     }
+  };
+
+  const selectCategory = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setMode('symptom');
+    const petDisplayName = petName && petName !== "your pet" ? petName : "your pet";
+    const categoryLabel = SYMPTOM_CATEGORIES.find(c => c.id === categoryId)?.label || categoryId;
+    setMessages([{
+      type: "bot",
+      text: `📋 **${categoryLabel}**\n\nDescribe ${petDisplayName}'s symptoms in detail, or upload a photo for assessment.`
+    }]);
   };
 
   const handleSend = async (messageOverride?: string) => {
@@ -224,13 +246,13 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
           botResponse = "I couldn't find an answer. Please try rephrasing your question.";
         }
       } else {
-        // SYMPTOM CHECKER - use triage endpoint (no category, let AI infer)
+        // SYMPTOM CHECKER - use triage endpoint with selected category
         const response = await fetch(`${API_BASE_URL}/api/triage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             species: petContext.species,
-            category: "auto", // Let AI determine category
+            category: selectedCategory || "Something Else",
             user_description: userMessage || "See attached image",
             structured_fields: {},
             image_base64: imageBase64,
@@ -390,13 +412,44 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
           </div>
         )}
 
+        {/* Category Selection */}
+        {mode === 'category' && (
+          <div className="flex-1 flex flex-col p-4 overflow-y-auto">
+            <div className="mb-4">
+              <button
+                onClick={() => setMode('select')}
+                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+              >
+                ← Back
+              </button>
+            </div>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">What's the issue?</h3>
+            <p className="text-sm text-gray-500 mb-4">Select the category that best describes {petName && petName !== "your pet" ? petName : "your pet"}'s symptoms</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              {SYMPTOM_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => selectCategory(cat.id)}
+                  className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 border-2 border-gray-200 rounded-xl transition text-center"
+                >
+                  <span className="text-2xl mb-2">{cat.icon}</span>
+                  <span className="text-sm font-medium text-gray-700">{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Chat Interface */}
-        {mode !== 'select' && (
+        {(mode === 'symptom' || mode === 'general') && (
           <>
             {/* Mode indicator */}
             <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
               <span className="text-sm font-medium text-gray-600">
-                {mode === 'symptom' ? '🩺 Symptom Checker' : '💬 General Question'}
+                {mode === 'symptom'
+                  ? `🩺 ${SYMPTOM_CATEGORIES.find(c => c.id === selectedCategory)?.label || 'Symptom Checker'}`
+                  : '💬 General Question'}
               </span>
               <button
                 onClick={() => setMode('select')}
