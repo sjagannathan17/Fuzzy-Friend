@@ -50,7 +50,7 @@ const GENERAL_SUGGESTIONS = [
 
 export default function ChatbotModal({ open, onClose, ownerName, petName }: ChatbotModalProps) {
   type ChatMessage = { type: string; text: string; image?: string };
-  
+
   const [mode, setMode] = useState<ChatMode>('select');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -59,7 +59,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  
+
   const { videoRef, startCamera, stopCamera, capturePhoto } = useCameraCapture((dataUrl) => {
     setImages((prev) => [...prev, dataUrl]);
     setCameraOpen(false);
@@ -104,7 +104,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
       try {
         const loc = JSON.parse(storedLoc);
         return { latitude: loc.lat, longitude: loc.lng };
-      } catch {}
+      } catch { }
     }
     return { latitude: undefined, longitude: undefined };
   };
@@ -112,7 +112,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
   const selectMode = (selectedMode: 'symptom' | 'general') => {
     setMode(selectedMode);
     const petDisplayName = petName && petName !== "your pet" ? petName : "your pet";
-    
+
     if (selectedMode === 'symptom') {
       setMessages([{
         type: "bot",
@@ -129,11 +129,11 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
   const handleSend = async (messageOverride?: string) => {
     const userMessage = messageOverride || input.trim();
     if (!userMessage && images.length === 0) return;
-    
+
     const petContext = getPetContext();
     const { latitude, longitude } = getLocation();
     const currentImages = [...images];
-    
+
     // Add user message to chat
     if (userMessage) {
       setMessages((msgs) => [...msgs, { type: "user", text: userMessage }]);
@@ -143,14 +143,14 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
         setMessages((msgs) => [...msgs, { type: "user", text: "[Image]", image: img }]);
       });
     }
-    
+
     setInput("");
     setImages([]);
     setIsLoading(true);
-    
+
     try {
       let botResponse = "";
-      
+
       // Prepare image data
       let imageBase64: string | undefined;
       let imageType: string | undefined;
@@ -161,7 +161,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
           imageBase64 = base64Match[2];
         }
       }
-      
+
       if (mode === 'general') {
         // GENERAL QUESTION - use chat endpoint
         const response = await fetch(`${API_BASE_URL}/api/chat`, {
@@ -178,18 +178,23 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
               weight: petContext.weight,
               weight_unit: petContext.weight_unit,
             },
+            // Include conversation history
+            history: messages.map(m => ({
+              role: m.type === 'user' ? 'user' : 'assistant' as const,
+              content: m.text
+            })),
             // Include image if provided
             image_base64: imageBase64,
             image_type: imageType,
           }),
         });
-        
+
         if (!response.ok) throw new Error(`API error: ${response.status}`);
         const data = await response.json();
-        
+
         if (data.success && data.response) {
           botResponse = data.response;
-          
+
           // Add source badges
           const toolsUsed = data.tools_used || [];
           const sourceLabels: string[] = [];
@@ -225,43 +230,43 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
             },
           }),
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           console.error('Triage error:', errorData);
           throw new Error(`API error: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.success && data.data) {
           const result = data.data;
           const riskStyle = getRiskStyle(result.risk_level);
-          
+
           botResponse = `**${riskStyle.label}**\n\n`;
-          
+
           if (result.red_flags && result.red_flags.length > 0) {
             botResponse += `**⚠️ Red Flags:**\n${result.red_flags.map((f: string) => `• ${f}`).join('\n')}\n\n`;
           }
-          
+
           if (result.recommended_actions && result.recommended_actions.length > 0) {
             botResponse += `**What to do:**\n${result.recommended_actions.map((a: string) => `• ${a}`).join('\n')}\n\n`;
           }
-          
+
           if (result.what_to_monitor && result.what_to_monitor.length > 0) {
             botResponse += `**Watch for:**\n${result.what_to_monitor.map((m: string) => `• ${m}`).join('\n')}\n\n`;
           }
-          
+
           if (result.follow_up_questions && result.follow_up_questions.length > 0) {
             botResponse += `**❓ Please answer:**\n${result.follow_up_questions.map((q: string) => `• ${q}`).join('\n')}\n\n`;
           }
-          
+
           if (result.nearby_vets && result.nearby_vets.length > 0) {
-            botResponse += `**📍 Nearby Vets:**\n${result.nearby_vets.map((v: { 
-              name: string; 
-              distance_miles?: number; 
-              distance_km?: number; 
-              phone?: string; 
+            botResponse += `**📍 Nearby Vets:**\n${result.nearby_vets.map((v: {
+              name: string;
+              distance_miles?: number;
+              distance_km?: number;
+              phone?: string;
               is_24_hour?: boolean;
               is_emergency_clinic?: boolean;
               opening_hours?: string;
@@ -272,9 +277,9 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
               return `• ${badge ? badge + ' ' : ''}${v.name} (${distance}) ${v.phone || ''}\n  ${hours}`;
             }).join('\n')}\n\n`;
           }
-          
+
           botResponse += `\n⚕️ ${result.disclaimer || 'This is not a veterinary diagnosis. If symptoms worsen, seek care.'}`;
-          
+
           // Show sources
           const sourceLabels: string[] = [];
           const ragCount = result.rag_source_count || 0;
@@ -288,14 +293,14 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
           botResponse = "I couldn't analyze that. Please try again with more details.";
         }
       }
-      
+
       setMessages((msgs) => [...msgs, { type: "bot", text: botResponse }]);
-      
+
     } catch (error) {
       console.error('API error:', error);
-      setMessages((msgs) => [...msgs, { 
-        type: "bot", 
-        text: "Sorry, I couldn't connect to the AI service. Please make sure the backend is running." 
+      setMessages((msgs) => [...msgs, {
+        type: "bot",
+        text: "Sorry, I couldn't connect to the AI service. Please make sure the backend is running."
       }]);
     } finally {
       setIsLoading(false);
@@ -325,7 +330,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
   };
 
   if (!open) return null;
-  
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 relative flex flex-col" style={{ height: '85vh', maxHeight: '700px' }}>
@@ -334,32 +339,32 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
           <h2 className="text-lg font-bold text-gray-900">🐾 Fuzzy Friend</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl">×</button>
         </div>
-        
+
         {/* Mode Selection */}
         {mode === 'select' && (
           <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
             <p className="text-gray-600 text-center">
               Hi{ownerName ? ` ${ownerName}` : ""}! How can I help {petName && petName !== "your pet" ? petName : "your pet"} today?
             </p>
-            
+
             <button
               onClick={() => selectMode('symptom')}
-              className="w-full bg-red-50 hover:bg-red-100 border-2 border-red-200 rounded-xl p-4 text-left transition"
+              className="w-full bg-red-50 hover:bg-red-100 border-2 border-red-200 rounded-xl p-6 text-left transition"
             >
-              <div className="font-bold text-red-700 text-lg">🩺 Symptom Checker</div>
-              <div className="text-red-600 text-sm mt-1">Describe symptoms or upload a photo for assessment</div>
+              <div className="font-bold text-red-700 text-lg mt-2">🩺 Symptom Checker</div>
+              <div className="text-red-600 text-sm mt-2 mb-2">Please describe symptoms or upload a photo for assessment. Open a new checker for a new symptom.</div>
             </button>
-            
-                <button
+
+            <button
               onClick={() => selectMode('general')}
-              className="w-full bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl p-4 text-left transition"
+              className="w-full hover:bg-gray-50 rounded-xl p-4 text-left transition"
             >
-              <div className="font-bold text-blue-700 text-lg">💬 General Question</div>
-              <div className="text-blue-600 text-sm mt-1">Pet care, nutrition, behavior tips</div>
-                </button>
+              <div className="font-medium text-blue-700 text-sm mt-2">💬 General Question</div>
+              <div className="text-blue-600 text-xs mt-1">Pet care, nutrition, behavior tips</div>
+            </button>
           </div>
         )}
-        
+
         {/* Chat Interface */}
         {mode !== 'select' && (
           <>
@@ -368,14 +373,14 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
               <span className="text-sm font-medium text-gray-600">
                 {mode === 'symptom' ? '🩺 Symptom Checker' : '💬 General Question'}
               </span>
-              <button 
-                onClick={() => setMode('select')} 
+              <button
+                onClick={() => setMode('select')}
                 className="text-xs text-blue-600 hover:underline"
               >
                 Switch mode
               </button>
             </div>
-            
+
             {/* Messages */}
             <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3" style={{ minHeight: 0 }}>
               {messages.map((msg, i) => (
@@ -384,17 +389,17 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
                     <img src={msg.image} alt="Upload" className="inline-block h-24 w-24 object-cover rounded-xl border-2 border-blue-200 mb-1" />
                   )}
                   <span className={
-                    msg.type === "user" 
-                      ? "inline-block bg-blue-500 text-white rounded-2xl px-4 py-2 max-w-[85%] break-words" 
+                    msg.type === "user"
+                      ? "inline-block bg-blue-500 text-white rounded-2xl px-4 py-2 max-w-[85%] break-words"
                       : "inline-block bg-gray-100 text-gray-800 rounded-2xl px-4 py-2 text-left max-w-[90%] whitespace-pre-wrap text-sm break-words"
                   }>
-                    {msg.text.split('**').map((part, idx) => 
+                    {msg.text.split('**').map((part, idx) =>
                       idx % 2 === 1 ? <strong key={idx}>{part}</strong> : part
                     )}
                   </span>
                 </div>
               ))}
-              
+
               {isLoading && (
                 <div className="text-left">
                   <span className="inline-block bg-gray-100 text-gray-600 rounded-2xl px-4 py-2">
@@ -406,7 +411,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
                 </div>
               )}
             </div>
-            
+
             {/* Suggestions - only show if no messages yet (besides greeting) */}
             {messages.length === 1 && !isLoading && (
               <div className="px-4 pb-2">
@@ -424,47 +429,47 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
                 </div>
               </div>
             )}
-            
+
             {/* Image preview */}
             {images.length > 0 && (
               <div className="px-4 pb-2 flex gap-2">
                 {images.map((img, idx) => (
                   <div key={idx} className="relative">
                     <img src={img} alt="Preview" className="h-16 w-16 object-cover rounded-lg border" />
-          <button
+                    <button
                       onClick={() => setImages(images.filter((_, i) => i !== idx))}
                       className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-          >
+                    >
                       ×
-          </button>
+                    </button>
                   </div>
                 ))}
               </div>
             )}
-            
+
             {/* Camera view */}
-          {cameraOpen && (
+            {cameraOpen && (
               <div className="px-4 pb-2">
                 <div className="relative bg-black rounded-lg overflow-hidden">
                   <video ref={videoRef} autoPlay playsInline className="w-full h-48 object-cover" />
                   <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-2">
-                  <button
-                    onClick={capturePhoto}
+                    <button
+                      onClick={capturePhoto}
                       className="bg-white text-gray-800 rounded-full px-4 py-2 text-sm font-medium"
-                  >
+                    >
                       📸 Capture
-                  </button>
-                  <button
-                    onClick={() => { stopCamera(); setCameraOpen(false); }}
+                    </button>
+                    <button
+                      onClick={() => { stopCamera(); setCameraOpen(false); }}
                       className="bg-gray-800 text-white rounded-full px-4 py-2 text-sm"
-                  >
-                    Cancel
-                  </button>
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-            
+            )}
+
             {/* Input area */}
             <div className="p-4 border-t bg-white">
               <div className="flex items-center gap-2">
@@ -492,14 +497,14 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
                   className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                   disabled={isLoading}
                 />
-                  <button
+                <button
                   onClick={() => handleSend()}
                   disabled={isLoading || (!input.trim() && images.length === 0)}
                   className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white rounded-full px-4 py-2 text-sm font-medium transition"
-                  >
+                >
                   Send
-                  </button>
-                </div>
+                </button>
+              </div>
             </div>
           </>
         )}

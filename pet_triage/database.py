@@ -72,8 +72,25 @@ def init_db():
             )
         """)
         
+        # Triage sessions table - stores triage history for users
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS triage_sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                session_id TEXT NOT NULL,
+                species TEXT,
+                category TEXT,
+                user_description TEXT,
+                risk_level TEXT,
+                response_json TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        
         conn.commit()
         print(f"Database initialized at {DB_PATH}")
+
 
 
 # =============================================================================
@@ -206,6 +223,119 @@ def delete_pet_profile(user_id: str) -> bool:
         cursor.execute("DELETE FROM pet_profiles WHERE user_id = ?", (user_id,))
         conn.commit()
         return cursor.rowcount > 0
+
+
+# =============================================================================
+# Triage Session Operations
+# =============================================================================
+
+def save_triage_session(
+    session_id: str,
+    species: str = None,
+    category: str = None,
+    user_description: str = None,
+    risk_level: str = None,
+    response_json: str = None,
+    user_id: str = None
+) -> Dict[str, Any]:
+    """
+    Save a triage session to the database.
+    
+    Args:
+        session_id: Frontend session identifier
+        species: Pet species (dog/cat)
+        category: Symptom category
+        user_description: User's symptom description
+        risk_level: Triage risk level (ER/TODAY/SOON/MONITOR)
+        response_json: Full JSON response as string
+        user_id: User ID if logged in (optional)
+    
+    Returns:
+        Saved session data
+    """
+    import uuid
+    
+    record_id = f"triage_{uuid.uuid4().hex[:12]}"
+    now = datetime.utcnow().isoformat()
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO triage_sessions (
+                id, user_id, session_id, species, category,
+                user_description, risk_level, response_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (record_id, user_id, session_id, species, category,
+              user_description, risk_level, response_json, now))
+        conn.commit()
+    
+    return {
+        "id": record_id,
+        "session_id": session_id,
+        "user_id": user_id,
+        "species": species,
+        "category": category,
+        "risk_level": risk_level,
+        "created_at": now
+    }
+
+
+def get_triage_sessions(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Get triage history for a user.
+    
+    Args:
+        user_id: User ID
+        limit: Maximum number of sessions to return
+    
+    Returns:
+        List of triage sessions, most recent first
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, session_id, species, category, user_description,
+                   risk_level, created_at
+            FROM triage_sessions
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+        """, (user_id, limit))
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_triage_session_by_id(session_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get a specific triage session by ID.
+    
+    Args:
+        session_id: Session ID (either record ID or frontend session_id)
+    
+    Returns:
+        Full session data including response_json
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        # Try matching by record ID first, then by session_id
+        cursor.execute("""
+            SELECT * FROM triage_sessions
+            WHERE id = ? OR session_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (session_id, session_id))
+        row = cursor.fetchone()
+        if row:
+            session = dict(row)
+            # Parse response_json if present
+            if session.get("response_json"):
+                import json
+                try:
+                    session["response"] = json.loads(session["response_json"])
+                except json.JSONDecodeError:
+                    session["response"] = None
+            return session
+        return None
 
 
 # Initialize database on module import

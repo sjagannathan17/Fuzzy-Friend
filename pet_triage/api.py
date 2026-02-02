@@ -34,14 +34,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from main import run_triage, run_triage_agent
 from shared.constants import SUPPORTED_CATEGORIES, SUPPORTED_SPECIES
 from shared.schemas import TriageResponse, get_fallback_response
-from RAG.tools import find_nearby_vets
+from core.tools import find_nearby_vets
 from auth import (
     UserRegister, UserLogin, AuthResponse,
     register_user, login_user, get_current_user, verify_token
 )
 from database import (
     create_or_update_pet_profile,
-    get_pet_profile
+    get_pet_profile,
+    save_triage_session,
+    get_triage_sessions,
+    get_triage_session_by_id
 )
 
 # Load environment variables
@@ -116,6 +119,7 @@ class ChatMessage(BaseModel):
     # Optional image for analysis
     image_base64: Optional[str] = None
     image_type: Optional[str] = None
+    history: Optional[List[Dict[str, str]]] = []  # New field for conversation history
 
 
 class APIResponse(BaseModel):
@@ -336,7 +340,7 @@ async def get_nearby_vets(request: NearbyVetsRequest):
 # =============================================================================
 
 @app.post("/api/triage", response_model=APIResponse)
-async def triage_assessment(request: TriageRequest):
+async def triage_assessment(request: TriageRequest, http_request: Request):
     """
     Main triage assessment endpoint.
     
@@ -384,6 +388,15 @@ async def triage_assessment(request: TriageRequest):
                 "sex": request.pet_profile.sex,
             }
         
+        # Get user ID and fetch history if authenticated
+        user_id = get_user_id_from_token(http_request)
+        triage_history = []
+        if user_id:
+            try:
+                triage_history = get_triage_sessions(user_id, limit=5)
+            except Exception as e:
+                print(f"Failed to fetch triage history: {e}")
+
         # Run triage
         result = run_triage(
             species=request.species.lower(),
@@ -395,12 +408,30 @@ async def triage_assessment(request: TriageRequest):
             image_type=request.image_type,
             latitude=request.latitude,
             longitude=request.longitude,
+            triage_history=triage_history,  # Pass history
             verbose=False  # Disable verbose logging for API
         )
         
         processing_time = int((time.time() - start_time) * 1000)
         
         if result.get("success"):
+            # Save triage session to database (if user is authenticated)
+            user_id = get_user_id_from_token(http_request)
+            try:
+                import json
+                response_data = result.get("response", {})
+                save_triage_session(
+                    session_id=trace_id,
+                    species=request.species,
+                    category=category,
+                    user_description=request.user_description[:500] if request.user_description else None,
+                    risk_level=response_data.get("risk_level"),
+                    response_json=json.dumps(response_data),
+                    user_id=user_id
+                )
+            except Exception as save_err:
+                print(f"Failed to save triage session: {save_err}")
+            
             return APIResponse(
                 success=True,
                 trace_id=trace_id,
@@ -446,6 +477,52 @@ async def triage_assessment(request: TriageRequest):
 
 
 # =============================================================================
+# Triage History Endpoints
+# =============================================================================
+
+@app.get("/api/triage/history")
+async def get_triage_history(request: Request, limit: int = 20):
+    """
+    Get triage history for the authenticated user.
+    
+    Returns list of past triage sessions (most recent first).
+    """
+    user_id = get_user_id_from_token(request)
+    if not user_id:
+        return {"success": False, "error": "Authentication required", "sessions": []}
+    
+    sessions = get_triage_sessions(user_id, limit=limit)
+    return {
+        "success": True,
+        "sessions": sessions,
+        "count": len(sessions)
+    }
+
+
+@app.get("/api/triage/{session_id}")
+async def get_triage_detail(session_id: str, request: Request):
+    """
+    Get details of a specific triage session.
+    
+    Returns full session data including the complete response.
+    """
+    session = get_triage_session_by_id(session_id)
+    
+    if not session:
+        return {"success": False, "error": "Session not found"}
+    
+    # Check ownership if user is logged in
+    user_id = get_user_id_from_token(request)
+    if session.get("user_id") and session.get("user_id") != user_id:
+        return {"success": False, "error": "Access denied"}
+    
+    return {
+        "success": True,
+        "session": session
+    }
+
+
+# =============================================================================
 # Chat Endpoint (Conversational Follow-up)
 # =============================================================================
 
@@ -461,7 +538,7 @@ async def chat_followup(request: ChatMessage):
     
     try:
         # Import agent here to avoid circular imports
-        from RAG.agent import PetHealthAgent
+        from core.agent import PetHealthAgent
         
         # Create agent instance
         agent = PetHealthAgent(
@@ -515,7 +592,7 @@ async def chat_followup(request: ChatMessage):
         image_analysis = None
         if request.image_base64:
             try:
-                from RAG.image_analyzer import analyze_pet_image
+                from core.image_analyzer import analyze_pet_image
                 import tempfile
                 import base64
                 
@@ -540,7 +617,7 @@ async def chat_followup(request: ChatMessage):
                 print(f"Image analysis failed: {e}")
         
         # Run chat
-        result = agent.chat(user_msg, context=context)
+        result = agent.chat(user_msg, context=context, history=request.history)
         
         processing_time = int((time.time() - start_time) * 1000)
         

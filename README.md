@@ -1,99 +1,117 @@
-# 🐾 Fuzzy Friend – Pet Health AI (GenAI Group Project)
+# Fuzzy Friend: AI-Powered Pet Triage System
 
-Fuzzy Friend is a **mobile-first pet health application** designed to help pet owners assess **symptom urgency**, make informed decisions about veterinary care, and reduce unnecessary emergency room visits while identifying truly urgent cases.
-
-This project is part of a **Generative AI group assignment**, focusing on **frontend UI/UX design** with future integration of **LLMs, RAG, and LangChain**.
+**Fuzzy Friend** is an intelligent pet health assistant designed to help pet owners assess symptoms, determine urgency, and find nearby veterinary care. It combines a user-friendly Next.js frontend with a robust Python backend powered by LLM Agents and RAG (Retrieval-Augmented Generation).
 
 ---
 
-## 🚀 Project Overview
+## System Architecture
 
-Pet owners often struggle to decide whether a symptom requires immediate veterinary attention.  
-**Fuzzy Friend** addresses this gap by providing:
+The system follows a modern client-server architecture with an autonomous AI agent core.
 
-- A friendly, mobile-style interface
-- Clear symptom urgency guidance
-- AI-assisted conversational assessment
-- Community support and educational resources
+```mermaid
+graph TD
+    User([User]) <-->|Interacts| Frontend[Frontend - Next.js]
+    
+    subgraph "Frontend Layer"
+        Frontend <-->|API Calls| API[Backend API - FastAPI]
+    end
+    
+    subgraph "Backend Layer - Python"
+        API <-->|Requests| TriageEngine[Triage Engine]
+        API <-->|Auth| DB[(Database)]
+        
+        TriageEngine -->|1. Validate| InputGuard[Input Guardrails]
+        InputGuard -->|2. Process| Agent[LangChain Agent]
+        
+        subgraph "AI Agent Core"
+            Agent <-->|Decides Tool| Tools{Tool Selection}
+            Tools -->|Emergency Check| RedFlags[Red Flag Detector]
+            Tools -->|Knowledge Search| RAG[RAG / Vector DB]
+            Tools -->|Visual Analysis| Vision[Image Analyzer - GPT-4V]
+            Tools -->|Location| Maps[Vet Finder - OSM]
+        end
+        
+        Agent -->|3. Validate| OutputGuard[Output Guardrails]
+    end
+    
+    OutputGuard -->|JSON Response| API
+```
 
 ---
 
-## 📱 Application Structure (Frontend)
+## Project Structure
 
-The app follows a **5-tab mobile navigation design**:
-
-1. **Home**  
-   - Landing page with app name, tagline, about us, and “Get Started”
-2. **Profile**  
-   - Pet information (name, age, breed, etc.)  
-   - Medical/case history  
-   - Metrics and recent assessments
-3. **AI Chatbot**  
-   - Conversational symptom assessment  
-   - Displays urgency level  
-   - (Planned) Shows nearest ER vet when urgency is high
-4. **Community / Forum**  
-   - Pet owner discussions and shared experiences
-5. **Settings**  
-   - Privacy policy  
-   - About us  
-   - Customer support information
-
----
-
-## 🛠️ Tech Stack
-
-### Frontend
-- **Next.js (App Router)**
-- **TypeScript**
-- **Tailwind CSS**
-- **Poppins font** (modern, friendly mobile UI)
-- **GitHub Codespaces** (development environment)
-
-
-
-## 📁 Project Structure
-
+```
 genai_group_project/
-│
-├── frontend/                     # Frontend application (Next.js)
-│   │
-│   ├── app/                      # App Router pages (screens / tabs)
-│   │   ├── page.tsx              # Home (Landing page – default tab)
-│   │   ├── profile/
-│   │   │   └── page.tsx          # Profile tab (pet info, medical history, metrics)
-│   │   ├── onboarding/
-│   │   │   └── page.tsx          # Symptom check / onboarding flow
-│   │   ├── chat/
-│   │   │   └── page.tsx          # AI chatbot interface
-│   │   ├── forum/
-│   │   │   └── page.tsx          # Community / forum page
-│   │   ├── settings/
-│   │   │   └── page.tsx          # Settings, privacy, about us, support
-│   │   └── layout.tsx            # Global layout (fonts, sticky bottom navigation)
-│   │
-│   ├── components/               # Reusable UI components
-│   │   └── TopNav.tsx            # Mobile-style sticky bottom navigation (5 tabs)
-│   │
-│   ├── public/                   # Static assets
-│   │   └── fuzzy-friend-logo.png # Application logo
-│   │
-│   ├── styles/                   # Global styles (if extended later)
-│   │
-│   ├── package.json              # Project dependencies & scripts
-│   └── tailwind.config.js        # Tailwind CSS configuration
-│
-├── README.md                     # Project documentation
-└── .gitignore                    # Git ignored files
+├── .env                    # Environment variables (API keys)
+├── README.md               # This file
+├── frontend/               # Next.js frontend application
+│   ├── app/                # Page routes
+│   ├── components/         # Reusable UI components
+│   └── lib/                # Utility functions
+└── pet_triage/             # Python backend
+    ├── api.py              # FastAPI entry point
+    ├── auth.py             # JWT authentication
+    ├── database.py         # SQLite database operations
+    ├── core/               # AI Agent and RAG
+    │   ├── agent.py        # LangChain Agent
+    │   ├── tools.py        # Agent tools
+    │   ├── rag_chain.py    # RAG knowledge base
+    │   └── image_analyzer.py
+    ├── shared/             # Shared constants and schemas
+    └── tests/              # Unit tests
+```
 
+---
 
-## 🧑‍💻 How to Run the App (No Local Setup Needed)
+## Key Features
 
-### Using GitHub Codespaces (Recommended)
+1. **AI Triage Assessment**: Structured analysis of symptoms to determine urgency (ER, Today, Soon, Monitor).
+2. **Patient Chart Memory**: The AI remembers past triage sessions to identify recurring issues without confusing history with current symptoms.
+3. **Multi-turn Chat**: Users can ask follow-up questions in "General Question" mode with full conversation history context.
+4. **Visual Symptom Analysis**: Users can upload photos of their pet's condition for GPT-4V analysis.
+5. **RAG Knowledge Base**: Answers backed by a vector database of 18,000+ veterinary records.
+6. **Nearby Vet Finder**: Automatically locates open clinics based on the user's geolocation.
+7. **Safety Guardrails**: Strict input/output validation to prevent hallucinations and ensure safe medical advice.
 
-1. Open this repository on GitHub
-2. Click **Code → Codespaces → Create Codespace**
-3. In the terminal, run:
-   ```bash
-   cd frontend
-   npm run dev
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js and npm
+- Python 3.10+
+- OpenAI API Key
+
+### Installation
+
+1. **Backend Setup**:
+    ```bash
+    cd pet_triage
+    pip install -r requirements.txt
+    python -m uvicorn api:app --host 0.0.0.0 --port 8000
+    ```
+
+2. **Frontend Setup**:
+    ```bash
+    cd frontend
+    npm install
+    npm run dev
+    ```
+
+3. Access the app at `http://localhost:3000`.
+
+---
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/categories` | GET | Get symptom categories |
+| `/api/triage` | POST | Run symptom triage (with history) |
+| `/api/chat` | POST | General pet health chat (multi-turn) |
+| `/api/auth/register` | POST | User registration |
+| `/api/auth/login` | POST | User login |
+| `/api/pet-profile` | POST | Save pet profile |
+| `/api/nearby-vets` | POST | Find nearby clinics |
