@@ -450,7 +450,20 @@ async def triage_assessment(request: TriageRequest, http_request: Request):
                 is_er=result.get("is_er", False)
             )
         else:
-            # Triage failed, return fallback
+            # Check if this is a guardrail rejection (off-topic, wrong species, etc.)
+            if result.get("guardrail_rejected"):
+                # Return the rejection message directly to the user
+                return APIResponse(
+                    success=False,
+                    trace_id=trace_id,
+                    timestamp=datetime.utcnow().isoformat(),
+                    processing_time_ms=processing_time,
+                    error_code="GUARDRAIL_REJECTED",
+                    error_message=result.get("error", "Request rejected by input guardrails"),
+                    is_er=False
+                )
+
+            # Triage failed for other reasons, return fallback
             fallback = get_fallback_response(result.get("error"))
             return APIResponse(
                 success=True,  # Still return success with fallback

@@ -107,7 +107,8 @@ def run_triage_agent(
         "is_er": False,
         "model_used": None,
         "tools_used": [],
-        "mode": "agent"
+        "mode": "agent",
+        "guardrail_rejected": False  # Flag for input guardrail rejections
     }
 
     # =========================================================================
@@ -128,6 +129,7 @@ def run_triage_agent(
 
     if not guardrail_result["passed"]:
         result["error"] = guardrail_result["error"]
+        result["guardrail_rejected"] = True  # Mark as guardrail rejection
         return result
 
     result["warnings"] = guardrail_result["warnings"]
