@@ -70,6 +70,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",      # Next.js dev server
         "http://127.0.0.1:3000",
+         "http://localhost:3003",
+         "http://127.0.0.1:3003",
         "https://localhost:3000",
         # Add production domains here
     ],
