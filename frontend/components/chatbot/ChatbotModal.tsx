@@ -48,8 +48,23 @@ const GENERAL_SUGGESTIONS = [
   "Exercise recommendations",
 ];
 
+// Get urgency badge style based on risk level
+const getUrgencyBadge = (riskLevel: string) => {
+  switch (riskLevel) {
+    case 'ER':
+    case 'TODAY':
+      return { label: 'High', className: 'bg-red-100 text-red-700' };
+    case 'SOON':
+      return { label: 'Medium', className: 'bg-yellow-100 text-yellow-700' };
+    case 'MONITOR':
+      return { label: 'Low', className: 'bg-green-100 text-green-700' };
+    default:
+      return null;
+  }
+};
+
 export default function ChatbotModal({ open, onClose, ownerName, petName }: ChatbotModalProps) {
-  type ChatMessage = { type: string; text: string; image?: string };
+  type ChatMessage = { type: string; text: string; image?: string; riskLevel?: string };
 
   const [mode, setMode] = useState<ChatMode>('select');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -150,6 +165,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
 
     try {
       let botResponse = "";
+      let triageRiskLevel: string | undefined;
 
       // Prepare image data
       let imageBase64: string | undefined;
@@ -242,6 +258,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
         if (data.success && data.data) {
           const result = data.data;
           const riskStyle = getRiskStyle(result.risk_level);
+          triageRiskLevel = result.risk_level;
 
           botResponse = `**${riskStyle.label}**\n\n`;
 
@@ -302,7 +319,7 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
         }
       }
 
-      setMessages((msgs) => [...msgs, { type: "bot", text: botResponse }]);
+      setMessages((msgs) => [...msgs, { type: "bot", text: botResponse, riskLevel: triageRiskLevel }]);
 
     } catch (error) {
       console.error('API error:', error);
@@ -391,22 +408,32 @@ export default function ChatbotModal({ open, onClose, ownerName, petName }: Chat
 
             {/* Messages */}
             <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3" style={{ minHeight: 0 }}>
-              {messages.map((msg, i) => (
-                <div key={i} className={msg.type === "user" ? "text-right" : "text-left"}>
-                  {msg.image && (
-                    <img src={msg.image} alt="Upload" className="inline-block h-24 w-24 object-cover rounded-xl border-2 border-blue-200 mb-1" />
-                  )}
-                  <span className={
-                    msg.type === "user"
-                      ? "inline-block bg-blue-500 text-white rounded-2xl px-4 py-2 max-w-[85%] break-words"
-                      : "inline-block bg-gray-100 text-gray-800 rounded-2xl px-4 py-2 text-left max-w-[90%] whitespace-pre-wrap text-sm break-words"
-                  }>
-                    {msg.text.split('**').map((part, idx) =>
-                      idx % 2 === 1 ? <strong key={idx}>{part}</strong> : part
+              {messages.map((msg, i) => {
+                const urgencyBadge = msg.riskLevel ? getUrgencyBadge(msg.riskLevel) : null;
+                return (
+                  <div key={i} className={msg.type === "user" ? "text-right" : "text-left"}>
+                    {msg.image && (
+                      <img src={msg.image} alt="Upload" className="inline-block h-24 w-24 object-cover rounded-xl border-2 border-blue-200 mb-1" />
                     )}
-                  </span>
-                </div>
-              ))}
+                    <span className={
+                      msg.type === "user"
+                        ? "inline-block bg-blue-500 text-white rounded-2xl px-4 py-2 max-w-[85%] break-words"
+                        : "inline-block bg-gray-100 text-gray-800 rounded-2xl px-4 py-2 text-left max-w-[90%] whitespace-pre-wrap text-sm break-words"
+                    }>
+                      {msg.text.split('**').map((part, idx) =>
+                        idx % 2 === 1 ? <strong key={idx}>{part}</strong> : part
+                      )}
+                      {urgencyBadge && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <span className={`${urgencyBadge.className} text-xs font-bold px-3 py-1 rounded-full`}>
+                            {urgencyBadge.label}
+                          </span>
+                        </div>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
 
               {isLoading && (
                 <div className="text-left">
