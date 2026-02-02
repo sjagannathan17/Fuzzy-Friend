@@ -804,7 +804,6 @@ class OffTopicGuardrails:
     PET_KEYWORDS = [
         # Animals
         "dog", "cat", "puppy", "kitten", "pet", "pup", "kitty", "canine", "feline",
-        "狗", "猫", "宠物", "狗狗", "猫猫", "小狗", "小猫",
         # Body parts
         "paw", "fur", "tail", "ear", "eye", "nose", "mouth", "gum", "teeth", "leg",
         "belly", "stomach", "skin", "coat", "nail", "claw",
@@ -824,31 +823,22 @@ class OffTopicGuardrails:
     OFF_TOPIC_KEYWORDS = [
         # Weather
         "weather", "rain", "sunny", "cloud", "temperature", "forecast",
-        "天气", "下雨", "晴天",
         # Food/Cooking (human)
         "recipe", "cook", "bake", "ingredient", "restaurant", "menu",
-        "菜谱", "做饭", "烹饪", "餐厅",
         # Math/Science
         "calculate", "equation", "formula", "solve", "math", "algebra",
-        "计算", "数学", "方程",
         # Programming
         "code", "program", "python", "javascript", "function", "debug", "api",
-        "代码", "编程", "程序",
         # Travel
         "flight", "hotel", "travel", "vacation", "tourist", "booking",
-        "机票", "酒店", "旅游", "旅行",
         # General knowledge
         "history", "politics", "president", "election", "country", "capital",
-        "历史", "政治", "总统",
         # Entertainment
         "movie", "music", "game", "sport", "football", "basketball",
-        "电影", "音乐", "游戏", "足球",
         # Shopping
         "buy", "price", "discount", "amazon", "shopping",
-        "购买", "价格", "打折",
         # Finance
         "stock", "bitcoin", "crypto", "investment", "bank",
-        "股票", "比特币", "投资",
     ]
 
     # Response message for off-topic requests
@@ -856,12 +846,6 @@ class OffTopicGuardrails:
         "I'm a pet health assistant specialized in dogs and cats. "
         "I can only help with pet health-related questions. "
         "Please describe your dog's or cat's symptoms or health concerns."
-    )
-
-    OFF_TOPIC_RESPONSE_CN = (
-        "我是一个专门针对猫狗的宠物健康助手。"
-        "我只能回答宠物健康相关的问题。"
-        "请描述您的狗或猫的症状或健康问题。"
     )
 
     @classmethod
@@ -875,11 +859,6 @@ class OffTopicGuardrails:
         """Check if text contains off-topic keywords."""
         text_lower = text.lower()
         return any(keyword in text_lower for keyword in cls.OFF_TOPIC_KEYWORDS)
-
-    @classmethod
-    def _is_chinese(cls, text: str) -> bool:
-        """Check if text contains Chinese characters."""
-        return any('\u4e00' <= char <= '\u9fff' for char in text)
 
     @classmethod
     def keyword_check(cls, text: str) -> Tuple[str, Optional[str]]:
@@ -979,9 +958,6 @@ Guidelines:
             return True, None
 
         if status == "off_topic":
-            # Determine language for response
-            if cls._is_chinese(text):
-                return False, cls.OFF_TOPIC_RESPONSE_CN
             return False, cls.OFF_TOPIC_RESPONSE
 
         # Step 2: Uncertain - use LLM if enabled
@@ -990,8 +966,6 @@ Guidelines:
             if is_on_topic:
                 return True, None
             else:
-                if cls._is_chinese(text):
-                    return False, cls.OFF_TOPIC_RESPONSE_CN
                 return False, cls.OFF_TOPIC_RESPONSE
 
         # If LLM fallback disabled and uncertain, allow (fail-open)
