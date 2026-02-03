@@ -34,18 +34,30 @@ graph TD
         API <-->|Auth| DB[(SQLite Database)]
         
         TriageEngine -->|1. Validate| InputGuard[Input Guardrails]
-        InputGuard -->|2. Process| Agent[LangGraph ReAct Agent]
+        InputGuard -->|2. Route| Router{Endpoint Router}
         
-        subgraph "AI Agent Core"
-            Agent <-->|Decides Tool| Tools{Tool Selection}
-            Tools -->|Emergency Check| RedFlags[Red Flag Detector]
-            Tools -->|Knowledge Search| RAG[RAG / Pinecone]
-            Tools -->|Visual Analysis| Vision[Image Analyzer - GPT-4V]
-            Tools -->|Location| Maps[Vet Finder - OSM]
-            Tools -->|Web Search| Web[Tavily Search]
+        subgraph "Dual-Agent Architecture"
+            Router -->|/api/chat| HealthAgent[PetHealthAgent<br/>General Q&A<br/>temp=0.7]
+            Router -->|/api/triage| TriageAgent[PetTriageAgent<br/>Symptom Triage<br/>temp=0.3]
+            
+            subgraph "Shared Tools (6)"
+                Tools1[vector_search<br/>check_red_flags<br/>find_nearby_vets]
+                Tools2[emergency_triage<br/>web_search<br/>analyze_image]
+            end
+            
+            subgraph "Triage-Only Tools (+3)"
+                Tools3[get_er_template<br/>request_followup<br/>generate_triage_response]
+            end
+            
+            HealthAgent <--> Tools1
+            HealthAgent <--> Tools2
+            TriageAgent <--> Tools1
+            TriageAgent <--> Tools2
+            TriageAgent <--> Tools3
         end
         
-        Agent -->|3. Validate| OutputGuard[Output Guardrails]
+        HealthAgent -->|3. Validate| OutputGuard[Output Guardrails]
+        TriageAgent -->|3. Validate| OutputGuard
     end
     
     OutputGuard -->|JSON Response| API
@@ -80,7 +92,7 @@ genai_group_project/
     ├── output_guardrails.py# 6-layer output validation
     ├── core/               # AI Agent module
     │   ├── agent.py        # LangGraph ReAct Agent
-    │   ├── tools.py        # Agent tools (7 tools)
+    │   ├── tools.py        # Agent tools (6 base + 3 triage)
     │   ├── rag_chain.py    # RAG knowledge base
     │   └── image_analyzer.py # GPT-4V image analysis
     ├── shared/             # Shared constants and schemas
@@ -101,7 +113,7 @@ genai_group_project/
 - API Keys (set in `.env` file):
   - `OPENAI_API_KEY` - Required
   - `PINECONE_API_KEY` - For RAG
-  - `TAVILY_API_KEY` - For web search (optional)
+  - `GOOGLE_API_KEY` - For Gemini web search (optional)
 
 ### Quick Start (One Command)
 
