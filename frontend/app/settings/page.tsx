@@ -1,35 +1,37 @@
 "use client";
 
-import { Home, User, MessageCircle, Users, Settings, Bell, Trash2, ChevronRight, LogOut } from "lucide-react";
+import { Bell, Trash2, ChevronRight, LogOut, User } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../components/AuthContext";
+import { usePet } from "../../components/PetContext";
+import BottomNav from "../../components/BottomNav";
+import dynamic from "next/dynamic";
+
+const ChatbotModal = dynamic(() => import("../../components/chatbot/ChatbotModal"), { ssr: false });
 
 export default function SettingsPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("settings");
   const { logout, user } = useAuth();
+  const { petName } = usePet();
+  const [chatbotOpen, setChatbotOpen] = useState(false);
+  const [ownerName, setOwnerName] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedOwner = localStorage.getItem('ownerName');
+      if (storedOwner) setOwnerName(storedOwner);
+    }
+  }, []);
 
   const handleSignOut = () => {
     logout();
     router.push("/auth");
   };
 
-  const tabs = [
-    { id: "home", icon: Home, label: "Home", href: "/" },
-    { id: "profile", icon: User, label: "Profile", href: "/profile" },
-    { id: "chat", icon: MessageCircle, label: "Chat", href: "/symptom-assistant" },
-    { id: "forum", icon: Users, label: "Forum", href: "/community-forum" },
-    { id: "settings", icon: Settings, label: "Settings", href: "/settings" },
-  ];
-
-  const handleTabClick = (href: string) => {
-    router.push(href);
-  };
-
   return (
-  <div className="min-h-screen pb-24" style={{ backgroundColor: '#f2dcdd' }}>
+    <div className="min-h-screen pb-24" style={{ backgroundColor: '#f2dcdd' }}>
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-6">
@@ -40,14 +42,14 @@ export default function SettingsPage() {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
-        
+
         {/* Notifications Section */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Bell className="w-5 h-5 text-indigo-600" />
             Notifications
           </h2>
-          
+
           {/* Toggle Row */}
           <div className="flex items-center justify-between py-4 border-b border-gray-200">
             <div className="flex-1">
@@ -56,14 +58,12 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-              className={`ml-4 relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                notificationsEnabled ? "bg-indigo-600" : "bg-gray-300"
-              }`}
+              className={`ml-4 relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${notificationsEnabled ? "bg-indigo-600" : "bg-gray-300"
+                }`}
             >
               <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  notificationsEnabled ? "translate-x-7" : "translate-x-1"
-                }`}
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${notificationsEnabled ? "translate-x-7" : "translate-x-1"
+                  }`}
               />
             </button>
           </div>
@@ -131,7 +131,7 @@ export default function SettingsPage() {
               <p className="text-gray-900 font-medium mt-1">{user.email}</p>
             </div>
           )}
-          <button 
+          <button
             onClick={handleSignOut}
             className="w-full bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
@@ -158,32 +158,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="flex justify-around">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    handleTabClick(tab.href);
-                  }}
-                  className={`flex flex-col items-center justify-center py-3 px-4 transition-colors ${
-                    activeTab === tab.id
-                      ? "text-indigo-600 border-t-2 border-indigo-600"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  <Icon className="w-6 h-6" />
-                  <span className="text-xs mt-1 font-medium">{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      <BottomNav onChatClick={() => setChatbotOpen(true)} />
+      <ChatbotModal open={chatbotOpen} onClose={() => setChatbotOpen(false)} ownerName={ownerName} petName={petName} />
     </div>
   );
 }
+

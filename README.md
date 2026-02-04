@@ -1,99 +1,217 @@
-# 🐾 Fuzzy Friend – Pet Health AI (GenAI Group Project)
+# 🐾 Fuzzy Friend: AI-Powered Pet Triage System
 
-Fuzzy Friend is a **mobile-first pet health application** designed to help pet owners assess **symptom urgency**, make informed decisions about veterinary care, and reduce unnecessary emergency room visits while identifying truly urgent cases.
-
-This project is part of a **Generative AI group assignment**, focusing on **frontend UI/UX design** with future integration of **LLMs, RAG, and LangChain**.
+**Fuzzy Friend** is an intelligent pet health assistant designed to help pet owners assess symptoms, determine urgency, and find nearby veterinary care. It combines a user-friendly Next.js frontend with a robust Python backend powered by LangChain/LangGraph Agents and RAG (Retrieval-Augmented Generation).
 
 ---
 
-## 🚀 Project Overview
+## ✨ Key Features
 
-Pet owners often struggle to decide whether a symptom requires immediate veterinary attention.  
-**Fuzzy Friend** addresses this gap by providing:
-
-- A friendly, mobile-style interface
-- Clear symptom urgency guidance
-- AI-assisted conversational assessment
-- Community support and educational resources
-
----
-
-## 📱 Application Structure (Frontend)
-
-The app follows a **5-tab mobile navigation design**:
-
-1. **Home**  
-   - Landing page with app name, tagline, about us, and “Get Started”
-2. **Profile**  
-   - Pet information (name, age, breed, etc.)  
-   - Medical/case history  
-   - Metrics and recent assessments
-3. **AI Chatbot**  
-   - Conversational symptom assessment  
-   - Displays urgency level  
-   - (Planned) Shows nearest ER vet when urgency is high
-4. **Community / Forum**  
-   - Pet owner discussions and shared experiences
-5. **Settings**  
-   - Privacy policy  
-   - About us  
-   - Customer support information
+| Feature | Description |
+|---------|-------------|
+| 🩺 **AI Triage Assessment** | Structured symptom analysis with 4 urgency levels (ER, Today, Soon, Monitor) |
+| 📋 **Symptom Categories** | 9 pre-defined categories for faster, more accurate triage |
+| 🧠 **Patient Chart Memory** | AI remembers past sessions to identify recurring issues |
+| 💬 **Multi-turn Chat** | Follow-up questions in General Question mode with full context |
+| 📷 **Visual Analysis** | Upload photos for GPT-4V image analysis |
+| 📚 **RAG Knowledge Base** | 18,000+ veterinary records via Pinecone vector database |
+| 📍 **Nearby Vet Finder** | Auto-locate open clinics using OpenStreetMap |
+| 🛡️ **Safety Guardrails** | 5-layer input + 6-layer output validation |
 
 ---
 
-## 🛠️ Tech Stack
+## 🏗️ System Architecture
 
-### Frontend
-- **Next.js (App Router)**
-- **TypeScript**
-- **Tailwind CSS**
-- **Poppins font** (modern, friendly mobile UI)
-- **GitHub Codespaces** (development environment)
+```mermaid
+graph TD
+    User([User]) <-->|Interacts| Frontend[Frontend - Next.js]
+    
+    subgraph "Frontend Layer"
+        Frontend <-->|API Calls| API[Backend API - FastAPI]
+    end
+    
+    subgraph "Backend Layer - Python"
+        API <-->|Requests| TriageEngine[Triage Engine]
+        API <-->|Auth| DB[(SQLite Database)]
+        
+        TriageEngine -->|1. Validate| InputGuard[Input Guardrails]
+        InputGuard -->|2. Route| Router{Endpoint Router}
+        
+        subgraph "Dual-Agent Architecture"
+            Router -->|/api/chat| HealthAgent[PetHealthAgent<br/>General Q&A<br/>temp=0.7]
+            Router -->|/api/triage| TriageAgent[PetTriageAgent<br/>Symptom Triage<br/>temp=0.3]
+            
+            subgraph "Shared Tools (6)"
+                Tools1[vector_search<br/>check_red_flags<br/>find_nearby_vets]
+                Tools2[emergency_triage<br/>web_search<br/>analyze_image]
+            end
+            
+            subgraph "Triage-Only Tools (+3)"
+                Tools3[get_er_template<br/>request_followup<br/>generate_triage_response]
+            end
+            
+            HealthAgent <--> Tools1
+            HealthAgent <--> Tools2
+            TriageAgent <--> Tools1
+            TriageAgent <--> Tools2
+            TriageAgent <--> Tools3
+        end
+        
+        HealthAgent -->|3. Validate| OutputGuard[Output Guardrails]
+        TriageAgent -->|3. Validate| OutputGuard
+    end
+    
+    OutputGuard -->|JSON Response| API
+```
 
-
+---
 
 ## 📁 Project Structure
 
+```
 genai_group_project/
-│
-├── frontend/                     # Frontend application (Next.js)
-│   │
-│   ├── app/                      # App Router pages (screens / tabs)
-│   │   ├── page.tsx              # Home (Landing page – default tab)
-│   │   ├── profile/
-│   │   │   └── page.tsx          # Profile tab (pet info, medical history, metrics)
-│   │   ├── onboarding/
-│   │   │   └── page.tsx          # Symptom check / onboarding flow
-│   │   ├── chat/
-│   │   │   └── page.tsx          # AI chatbot interface
-│   │   ├── forum/
-│   │   │   └── page.tsx          # Community / forum page
-│   │   ├── settings/
-│   │   │   └── page.tsx          # Settings, privacy, about us, support
-│   │   └── layout.tsx            # Global layout (fonts, sticky bottom navigation)
-│   │
-│   ├── components/               # Reusable UI components
-│   │   └── TopNav.tsx            # Mobile-style sticky bottom navigation (5 tabs)
-│   │
-│   ├── public/                   # Static assets
-│   │   └── fuzzy-friend-logo.png # Application logo
-│   │
-│   ├── styles/                   # Global styles (if extended later)
-│   │
-│   ├── package.json              # Project dependencies & scripts
-│   └── tailwind.config.js        # Tailwind CSS configuration
-│
-├── README.md                     # Project documentation
-└── .gitignore                    # Git ignored files
+├── .env                    # Environment variables (API keys)
+├── README.md               # This file
+├── start.sh                # Quick start script
+├── frontend/               # Next.js 14 frontend application
+│   ├── app/                # App Router pages
+│   │   ├── auth/           # Login/Register
+│   │   ├── chat/           # Chat interface
+│   │   ├── onboarding/     # Pet profile setup
+│   │   ├── profile/        # User profile
+│   │   └── settings/       # App settings
+│   ├── components/         # Reusable UI components
+│   │   └── chatbot/        # Chat modal with category selection
+│   └── lib/                # API client utilities
+└── pet_triage/             # Python backend
+    ├── api.py              # FastAPI entry point
+    ├── auth.py             # JWT authentication
+    ├── database.py         # SQLite database operations
+    ├── main.py             # Triage orchestration
+    ├── llm_setup.py        # OpenAI client & model config
+    ├── input_guardrails.py # 5-layer input validation
+    ├── output_guardrails.py# 6-layer output validation
+    ├── core/               # AI Agent module
+    │   ├── agent.py        # LangGraph ReAct Agent
+    │   ├── tools.py        # Agent tools (6 base + 3 triage)
+    │   ├── rag_chain.py    # RAG knowledge base
+    │   └── image_analyzer.py # GPT-4V image analysis
+    ├── shared/             # Shared constants and schemas
+    │   ├── constants.py    # Single source of truth
+    │   ├── prompts.py      # System prompts
+    │   ├── schemas.py      # Pydantic response schemas
+    │   └── red_flags.py    # Emergency detection rules
+    └── tests/              # Unit tests
+```
 
+---
 
-## 🧑‍💻 How to Run the App (No Local Setup Needed)
+## 🚀 Getting Started
 
-### Using GitHub Codespaces (Recommended)
+### Prerequisites
+- Node.js 18+ and npm
+- Python 3.10+
+- API Keys (set in `.env` file):
+  - `OPENAI_API_KEY` - Required
+  - `PINECONE_API_KEY` - For RAG
+  - `GOOGLE_API_KEY` - For Gemini web search (optional)
 
-1. Open this repository on GitHub
-2. Click **Code → Codespaces → Create Codespace**
-3. In the terminal, run:
-   ```bash
-   cd frontend
-   npm run dev
+### Quick Start (One Command)
+
+```bash
+# Mac/Linux
+chmod +x start.sh && ./start.sh
+
+# Or run manually:
+# Terminal 1: cd pet_triage && uvicorn api:app --reload --port 8000
+# Terminal 2: cd frontend && npm run dev
+```
+
+Then open **http://localhost:3000** in your browser.
+
+### Manual Installation
+
+1. **Backend Setup**:
+    ```bash
+    cd pet_triage
+    pip install -r requirements.txt
+    uvicorn api:app --host 0.0.0.0 --port 8000
+    ```
+
+2. **Frontend Setup**:
+    ```bash
+    cd frontend
+    npm install
+    npm run dev
+    ```
+
+3. Access the app at `http://localhost:3000`.
+
+---
+
+## 📋 Symptom Categories
+
+Users select a category before describing symptoms for more accurate triage:
+
+| Category | Icon | Examples |
+|----------|------|----------|
+| Toxic Ingestion & Poisoning | ☠️ | Ate chocolate, toxic plants |
+| Stomach Upset | 🤢 | Vomiting, diarrhea |
+| Itching & Skin Issues | 🔴 | Rashes, hair loss |
+| Injury & Bleeding | 🩹 | Cuts, wounds, trauma |
+| Concerning Behaviour Changes | 😰 | Lethargy, aggression |
+| Ears, Eyes, and Mouth | 👁️ | Eye discharge, ear infection |
+| Breathing Issues | 😮‍💨 | Coughing, wheezing |
+| Urinary & Genital | 💧 | Straining to urinate |
+| Something Else | ❓ | Other symptoms |
+
+---
+
+## 🚨 Risk Levels
+
+| Level | Icon | Meaning | Action |
+|-------|------|---------|--------|
+| **ER** | 🚨 | Emergency | Go to emergency vet NOW |
+| **TODAY** | ⚠️ | Urgent | Vet visit today |
+| **SOON** | 📅 | Non-urgent | Vet visit within 24-48 hours |
+| **MONITOR** | ✅ | Low-risk | Safe to monitor at home |
+
+---
+
+## 🔌 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/categories` | GET | Get symptom categories |
+| `/api/triage` | POST | Run symptom triage (with category & history) |
+| `/api/chat` | POST | General pet health chat (multi-turn) |
+| `/api/auth/register` | POST | User registration |
+| `/api/auth/login` | POST | User login |
+| `/api/pet-profile` | POST/GET | Save/retrieve pet profile |
+| `/api/nearby-vets` | POST | Find nearby clinics |
+| `/api/triage-history` | GET | Get triage session history |
+
+---
+
+## 🛡️ Safety Features
+
+- **No Diagnosis**: Only triage guidance, never definitive diagnosis
+- **No Medication Dosing**: Never provides drug dosages
+- **Conservative Escalation**: When uncertain, escalate to higher urgency
+- **Always Disclaimer**: Every response includes medical disclaimer
+- **Emergency Hard-Routing**: Critical conditions bypass LLM for immediate ER response
+
+---
+
+## 🧪 Running Tests
+
+```bash
+cd pet_triage
+python tests/run_all_tests.py
+```
+
+---
+
+## 📄 License
+
+This project is for educational purposes as part of ISBA 2421.

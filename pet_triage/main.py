@@ -22,7 +22,7 @@ NOTE: This file imports from shared module for consistency.
 import json
 import sys
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 # Add RAG directory to path for agent imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'RAG'))
@@ -61,6 +61,7 @@ def run_triage_agent(
     image_path: str = None,
     latitude: float = None,
     longitude: float = None,
+    triage_history: List[Dict[str, Any]] = None,  # New
     verbose: bool = True
 ) -> Dict[str, Any]:
     """
@@ -96,7 +97,7 @@ def run_triage_agent(
             - warnings: List of warnings
     """
     # Import agent here to avoid circular imports
-    from RAG.agent import PetTriageAgent
+    from core.agent import PetTriageAgent
 
     result = {
         "success": False,
@@ -106,7 +107,8 @@ def run_triage_agent(
         "is_er": False,
         "model_used": None,
         "tools_used": [],
-        "mode": "agent"
+        "mode": "agent",
+        "guardrail_rejected": False  # Flag for input guardrail rejections
     }
 
     # =========================================================================
@@ -127,10 +129,12 @@ def run_triage_agent(
 
     if not guardrail_result["passed"]:
         result["error"] = guardrail_result["error"]
+        result["guardrail_rejected"] = True  # Mark as guardrail rejection
         return result
 
     result["warnings"] = guardrail_result["warnings"]
     sanitized_description = guardrail_result["sanitized_text"]
+
 
     # =========================================================================
     # STEP 1.5: TEXT EMERGENCY PRE-CHECK
@@ -139,9 +143,11 @@ def run_triage_agent(
     text_lower = sanitized_description.lower()
     text_emergency_keywords = ["blood", "bleeding", "not breathing", "unconscious", 
                                "collapsed", "seizure", "hit by car", "poisoning",
-                               "ate poison", "choking", "can't breathe"]
+                               "ate poison", "choking", "can't breathe", "cant breathe",
+                               "blue gums", "pale gums", "white gums", "purple gums"]
     
     if any(keyword in text_lower for keyword in text_emergency_keywords):
+
         print("[Agent Mode - TEXT EMERGENCY DETECTED] Blood/emergency keyword found - forcing ER response")
         
         # Get ER template
@@ -154,7 +160,7 @@ def run_triage_agent(
         # Add nearby vets if location provided
         if latitude and longitude:
             try:
-                from RAG.tools import find_nearby_vets
+                from core.tools import find_nearby_vets
                 # First try emergency vets, then fall back to all vets
                 nearby_result = find_nearby_vets(latitude, longitude, radius_meters=15000, max_results=5, emergency_only=True)
                 if nearby_result.get("success") and nearby_result.get("vets") and len(nearby_result["vets"]) >= 2:
@@ -180,7 +186,7 @@ def run_triage_agent(
     # Analyze image FIRST and check for blood/trauma - override to ER immediately
     if image_base64:
         try:
-            from RAG.image_analyzer import analyze_pet_image
+            from core.image_analyzer import analyze_pet_image
             import tempfile
             import base64 as b64
             
@@ -216,7 +222,7 @@ def run_triage_agent(
                 # Add nearby vets if location provided
                 if latitude and longitude:
                     try:
-                        from RAG.tools import find_nearby_vets
+                        from core.tools import find_nearby_vets
                         # First try emergency vets, then fall back to all vets
                         nearby_result = find_nearby_vets(latitude, longitude, radius_meters=15000, max_results=5, emergency_only=True)
                         if nearby_result.get("success") and nearby_result.get("vets") and len(nearby_result["vets"]) >= 2:
@@ -263,7 +269,8 @@ def run_triage_agent(
             image_base64=image_base64,
             image_path=image_path,
             latitude=latitude,
-            longitude=longitude
+            longitude=longitude,
+            triage_history=triage_history  # New
         )
 
         result["model_used"] = agent.model
@@ -340,7 +347,7 @@ def run_triage_agent(
     if result["is_er"] and latitude is not None and longitude is not None:
         print("[Agent Mode - Step 4] Finding nearby emergency vets...")
         try:
-            from RAG.tools import find_nearby_vets as _find_nearby_vets
+            from core.tools import find_nearby_vets as _find_nearby_vets
             nearby_vets = _find_nearby_vets(
                 latitude=latitude,
                 longitude=longitude,
@@ -359,11 +366,7 @@ def run_triage_agent(
 
     return result
 
-
-# ============================================================================
-# Main Triage Function (Wrapper for Agent Mode)
-# ============================================================================
-
+# Redoing with better targeting. I will update `run_triage` signature first.
 def run_triage(
     species: str,
     category: str,
@@ -375,28 +378,11 @@ def run_triage(
     image_path: str = None,
     latitude: float = None,
     longitude: float = None,
+    triage_history: List[Dict[str, Any]] = None,  # New
     verbose: bool = False
 ) -> Dict[str, Any]:
     """
     Main triage function - wrapper for Agent mode.
-    
-    This function provides backward compatibility while using the Agent mode internally.
-    
-    Args:
-        species: Pet species (dog/cat)
-        category: Symptom category
-        structured_fields: Structured fields from UI
-        user_description: User's free text description
-        pet_profile: Pet profile information
-        image_base64: Base64 encoded image (optional)
-        image_type: Image MIME type (optional)
-        image_path: Path to image file (optional)
-        latitude: User latitude for vet finder (optional)
-        longitude: User longitude for vet finder (optional)
-        verbose: Print agent reasoning steps
-        
-    Returns:
-        Triage result dictionary
     """
     return run_triage_agent(
         species=species,
@@ -409,6 +395,7 @@ def run_triage(
         image_path=image_path,
         latitude=latitude,
         longitude=longitude,
+        triage_history=triage_history,  # Pass history
         verbose=verbose
     )
 

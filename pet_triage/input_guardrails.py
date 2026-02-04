@@ -786,16 +786,204 @@ class SafetyGuardrails:
 
 
 # ============================================================================
+# Part 5.5: Layer F - Off-Topic Detection Guardrails
+# ============================================================================
+
+class OffTopicGuardrails:
+    """
+    Layer F: Off-Topic Detection Guardrails
+
+    Two-stage detection:
+    1. Fast keyword-based filtering (no API call)
+    2. LLM-based classification as fallback (when uncertain)
+
+    This ensures users can only ask about pet health topics for dogs and cats.
+    """
+
+    # Pet-related keywords (if present, likely on-topic)
+    PET_KEYWORDS = [
+        # Animals
+        "dog", "cat", "puppy", "kitten", "pet", "pup", "kitty", "canine", "feline",
+        # Body parts
+        "paw", "fur", "tail", "ear", "eye", "nose", "mouth", "gum", "teeth", "leg",
+        "belly", "stomach", "skin", "coat", "nail", "claw",
+        # Symptoms & health
+        "vomit", "diarrhea", "itch", "scratch", "limp", "cough", "sneeze", "wheeze",
+        "bleed", "wound", "lump", "bump", "swelling", "rash", "discharge",
+        "lethargy", "appetite", "thirst", "urinate", "pee", "poop", "stool",
+        "breathing", "panting", "shaking", "seizure", "fever",
+        # Actions
+        "eating", "drinking", "walking", "running", "playing", "sleeping",
+        # Medical
+        "vet", "veterinarian", "vaccine", "medication", "treatment", "symptom",
+        "sick", "ill", "healthy", "pain", "hurt", "injured",
+    ]
+
+    # Clearly off-topic keywords (if present AND no pet keywords, likely off-topic)
+    OFF_TOPIC_KEYWORDS = [
+        # Weather
+        "weather", "rain", "sunny", "cloud", "temperature", "forecast",
+        # Food/Cooking (human)
+        "recipe", "cook", "bake", "ingredient", "restaurant", "menu",
+        # Math/Science
+        "calculate", "equation", "formula", "solve", "math", "algebra",
+        # Programming
+        "code", "program", "python", "javascript", "function", "debug", "api",
+        # Travel
+        "flight", "hotel", "travel", "vacation", "tourist", "booking",
+        # General knowledge
+        "history", "politics", "president", "election", "country", "capital",
+        # Entertainment
+        "movie", "music", "game", "sport", "football", "basketball",
+        # Shopping
+        "buy", "price", "discount", "amazon", "shopping",
+        # Finance
+        "stock", "bitcoin", "crypto", "investment", "bank",
+    ]
+
+    # Response message for off-topic requests
+    OFF_TOPIC_RESPONSE = (
+        "I'm a pet health assistant specialized in dogs and cats. "
+        "I can only help with pet health-related questions. "
+        "Please describe your dog's or cat's symptoms or health concerns."
+    )
+
+    @classmethod
+    def _contains_pet_keywords(cls, text: str) -> bool:
+        """Check if text contains pet-related keywords."""
+        text_lower = text.lower()
+        return any(keyword in text_lower for keyword in cls.PET_KEYWORDS)
+
+    @classmethod
+    def _contains_offtopic_keywords(cls, text: str) -> bool:
+        """Check if text contains off-topic keywords."""
+        text_lower = text.lower()
+        return any(keyword in text_lower for keyword in cls.OFF_TOPIC_KEYWORDS)
+
+    @classmethod
+    def keyword_check(cls, text: str) -> Tuple[str, Optional[str]]:
+        """
+        Fast keyword-based topic detection.
+
+        Returns:
+            (status, reason)
+            - status: "on_topic" | "off_topic" | "uncertain"
+            - reason: explanation for the decision
+        """
+        if not text or len(text.strip()) < 3:
+            return "uncertain", "Text too short to determine"
+
+        has_pet_keywords = cls._contains_pet_keywords(text)
+        has_offtopic_keywords = cls._contains_offtopic_keywords(text)
+
+        # Case 1: Has pet keywords → likely on-topic
+        if has_pet_keywords and not has_offtopic_keywords:
+            return "on_topic", "Contains pet health keywords"
+
+        # Case 2: Has off-topic keywords but no pet keywords → likely off-topic
+        if has_offtopic_keywords and not has_pet_keywords:
+            return "off_topic", "Contains off-topic keywords without pet context"
+
+        # Case 3: Has both or neither → uncertain, need LLM
+        if has_pet_keywords and has_offtopic_keywords:
+            return "uncertain", "Contains both pet and off-topic keywords"
+
+        # Case 4: No keywords detected → uncertain
+        return "uncertain", "No clear keywords detected"
+
+    @classmethod
+    def llm_check(cls, text: str) -> Tuple[bool, str]:
+        """
+        LLM-based topic classification (fallback for uncertain cases).
+
+        Uses a fast model (gpt-4o-mini) to determine if the text is about pet health.
+
+        Returns:
+            (is_on_topic, reason)
+        """
+        try:
+            from openai import OpenAI
+            import os
+
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+            prompt = f"""You are a classifier that determines if a user's message is about pet health for dogs or cats.
+
+User message: "{text}"
+
+Is this message about dog or cat health/symptoms/care?
+Reply with ONLY one word: "YES" or "NO"
+
+Guidelines:
+- YES: Questions about dog/cat symptoms, health, behavior, care, feeding, grooming
+- NO: Questions about other animals, weather, cooking, math, coding, travel, general knowledge, etc.
+- NO: Greetings without health context (just "hello", "hi")
+- YES: Even vague pet concerns like "my dog seems off" or "is this normal for cats"
+"""
+
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=10,
+                temperature=0
+            )
+
+            answer = response.choices[0].message.content.strip().upper()
+            is_on_topic = answer.startswith("YES")
+
+            return is_on_topic, f"LLM classified as {'on-topic' if is_on_topic else 'off-topic'}"
+
+        except Exception as e:
+            # If LLM fails, default to allowing (fail-open for user experience)
+            return True, f"LLM check failed ({str(e)}), defaulting to allow"
+
+    @classmethod
+    def check_topic(cls, text: str, use_llm_fallback: bool = True) -> Tuple[bool, Optional[str]]:
+        """
+        Main method: Check if text is on-topic (pet health for dogs/cats).
+
+        Args:
+            text: User input text
+            use_llm_fallback: Whether to use LLM for uncertain cases
+
+        Returns:
+            (is_on_topic, error_message)
+            - is_on_topic: True if on-topic, False if off-topic
+            - error_message: None if on-topic, rejection message if off-topic
+        """
+        # Step 1: Fast keyword check
+        status, reason = cls.keyword_check(text)
+
+        if status == "on_topic":
+            return True, None
+
+        if status == "off_topic":
+            return False, cls.OFF_TOPIC_RESPONSE
+
+        # Step 2: Uncertain - use LLM if enabled
+        if use_llm_fallback:
+            is_on_topic, llm_reason = cls.llm_check(text)
+            if is_on_topic:
+                return True, None
+            else:
+                return False, cls.OFF_TOPIC_RESPONSE
+
+        # If LLM fallback disabled and uncertain, allow (fail-open)
+        return True, None
+
+
+# ============================================================================
 # Part 6: Unified Input Guardrails Class
 # ============================================================================
 
 class InputGuardrails:
     """
     Unified Input Guardrails Class
-    
+
     Executes all checks in the order specified by the document:
     1. Sanitize and normalize input text
     2. Scope validation (species + supported categories)
+    2.5. Off-topic detection (keyword + LLM fallback) - NEW
     3. Structured field completeness check
     4. Immediate ER pre-check (structured first, then text fallback)
     5. Prompt injection / unsafe request detection
@@ -808,6 +996,7 @@ class InputGuardrails:
         self.er_check = ERPreCheckGuardrails()
         self.quality = InputQualityGuardrails()
         self.safety = SafetyGuardrails()
+        self.offtopic = OffTopicGuardrails()
     
     def validate_all(
         self,
@@ -869,7 +1058,18 @@ class InputGuardrails:
         if not passed and not structured_fields:
             result["error"] = error
             return result
-        
+
+        # ===== Step 2.5: Off-topic detection =====
+        # Only check if there's user text to analyze
+        if sanitized_text and len(sanitized_text) >= 5:
+            is_on_topic, offtopic_error = self.offtopic.check_topic(
+                sanitized_text,
+                use_llm_fallback=True
+            )
+            if not is_on_topic:
+                result["error"] = offtopic_error
+                return result
+
         # ===== Step 3: Structured field completeness =====
         complete, error, followup_questions = self.fields.check_completeness(
             category, structured_fields

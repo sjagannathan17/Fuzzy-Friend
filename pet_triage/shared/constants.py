@@ -250,8 +250,8 @@ OUTPUT_LIMITS = {
 
 INPUT_LIMITS = {
     "max_text_length": 1200,     # Max chars for user description
-    "max_image_size_mb": 5,      # Max image size
-    "allowed_image_types": ["image/jpeg", "image/jpg", "image/png"],
+    "max_image_size_mb": 15,     # Max image size (increased for smartphone photos)
+    "allowed_image_types": ["image/jpeg", "image/jpg", "image/png", "image/webp"],
 }
 
 

@@ -256,7 +256,7 @@ def ask_with_image(
     Returns:
         dict with 'image_analysis', 'rag_info', 'combined_response', 'severity', 'sources'
     """
-    from image_analyzer import analyze_with_context, analyze_pet_image
+    from .image_analyzer import analyze_with_context, analyze_pet_image
     
     # Step 1: Analyze the image
     print("Analyzing image...")

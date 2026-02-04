@@ -29,13 +29,13 @@ load_dotenv()
 # LangChain imports (updated for LangChain 1.2.x / LangGraph)
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langgraph.prebuilt import create_react_agent
 
 # Import existing tools (NO modifications to original files!)
 # Use aliases to avoid naming conflicts with @tool decorated functions
-from rag_chain import ask_simple, ask_with_image, get_chain
-from tools import (
+from .rag_chain import ask_simple, ask_with_image, get_chain
+from .tools import (
     check_red_flags as _check_red_flags_func,
     check_red_flags_for_agent,
     find_nearby_vets as _find_nearby_vets_func,
@@ -49,7 +49,7 @@ from tools import (
     get_er_template as _get_er_template_func,
     get_er_template_for_agent,
 )
-from image_analyzer import analyze_pet_image
+from .image_analyzer import analyze_pet_image
 
 # Get API key from environment (avoid config import conflicts)
 import os
@@ -157,6 +157,22 @@ Use the category to prioritize relevant search terms and tailor your response.
 6. Cite Sources: Mention which tool provided information
 7. Know Limits: You're not a veterinarian - recommend professional care when appropriate
 
+## SCOPE RESTRICTIONS (CRITICAL)
+
+8. ONLY Dogs and Cats: You can ONLY answer questions about dogs and cats. 
+   - If the user asks about OTHER animals (birds, reptiles, hamsters, horses, fish, etc.), politely respond:
+     "I'm sorry, I can only help with dogs and cats at this time. For [animal type] health concerns, please consult a veterinarian who specializes in exotic or [animal type] care."
+   - If the user asks about NON-PET topics (weather, cooking, math, general knowledge, etc.), respond:
+     "I'm a pet health assistant specialized in dogs and cats. I can only help with pet health-related questions. How can I help with your dog or cat today?"
+
+9. Image-Only Requests: When the user provides ONLY an image with no text description:
+   - FIRST analyze the image using analyze_image
+   - THEN ask 1-2 brief follow-up questions to better understand the concern, such as:
+     - "I can see your pet in the image. What specific concern would you like me to help with?"
+     - "When did you first notice this issue?"
+     - "Is your pet showing any other symptoms?"
+   - Do NOT provide a full assessment until you understand what the user is worried about
+
 ## Response Style
 - Acknowledge the symptom category if provided
 - Empathetic and clear
@@ -176,7 +192,7 @@ Remember: You can use multiple tools in sequence. Think step-by-step and choose 
 def _vector_search_wrapper(query: str) -> str:
     """Search the pet health knowledge database and return answer with sources."""
     try:
-        from rag_chain import ask
+        from .rag_chain import ask
         answer, sources = ask(query)
         
         result = f"Knowledge Database Result:\n{answer}\n"
@@ -566,13 +582,14 @@ class PetHealthAgent:
         # Simple message history for conversation
         self.chat_history = []
 
-    def chat(self, user_input: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    def chat(self, user_input: str, context: Dict[str, Any] = None, history: List[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Chat with the agent.
 
         Args:
             user_input: User's question or message
             context: Optional context (pet_info, location, etc.)
+            history: Optional list of previous messages [{"role": "user", "content": "..."}, ...]
 
         Returns:
             Dictionary with:
@@ -580,6 +597,15 @@ class PetHealthAgent:
                 - intermediate_steps: List of tool calls made
                 - chat_history: Conversation history
         """
+        # Re-hydrate history if provided
+        if history:
+            for msg in history:
+                if msg.get("role") == "user":
+                    self.chat_history.append(HumanMessage(content=msg.get("content", "")))
+                elif msg.get("role") == "assistant":
+                    self.chat_history.append(AIMessage(content=msg.get("content", "")))
+
+        # Add context to input if provided
         # Add context to input if provided
         full_input = user_input
         if context:
@@ -617,7 +643,6 @@ class PetHealthAgent:
         # Update history
         self.chat_history.append(HumanMessage(content=user_input))
         if final_output:
-            from langchain_core.messages import AIMessage
             self.chat_history.append(AIMessage(content=final_output))
 
         return {
@@ -664,6 +689,13 @@ class PetHealthAgent:
 TRIAGE_AGENT_SYSTEM_PROMPT = """You are a Pet Health Triage Agent. Your job is to assess pet health concerns and provide structured triage responses.
 
 ## CRITICAL WORKFLOW - FOLLOW EXACTLY
+
+### MEDICAL HISTORY (If Provided)
+You may receive "Pet Medical History" context.
+- Use this ONLY to identify chronic/recurring issues.
+- If current symptoms match history (e.g. "vomiting again"), consider it a recurring issue (potentially higher risk).
+- DO NOT treat past symptoms as current ones unless the user mentions them again today.
+- This is for CONTEXT only. Focus on the CURRENT description for triage.
 
 ### Step 1: ANALYZE IMAGE FIRST (if provided)
 If an image is provided, use `analyze_image` FIRST before anything else.
@@ -735,6 +767,18 @@ Use `generate_triage_response` tool with:
 - analyze_image: Analyze pet photos
 - find_nearby_vets: Find veterinary clinics
 - generate_triage_response: Format final response (ALWAYS USE LAST)
+
+## SCOPE RESTRICTIONS (CRITICAL)
+
+6. ONLY Dogs and Cats: You can ONLY assess dogs and cats.
+   - If species is NOT dog or cat, respond with an error message explaining you only support dogs and cats.
+   - Never attempt to triage other animals (birds, reptiles, horses, fish, etc.)
+
+7. Image-Only Requests: When the user provides ONLY an image with no symptom description:
+   - FIRST analyze the image using analyze_image to check for emergencies
+   - If emergency signs detected (blood, wounds, distress) → use get_er_template immediately
+   - If NO emergency signs → use request_followup to ask what specific concern they have
+   - Example: "I can see your pet in the image. What specific symptom or concern brought you to us today?"
 """
 
 
@@ -808,7 +852,8 @@ class PetTriageAgent:
         image_base64: str = None,
         image_path: str = None,
         latitude: float = None,
-        longitude: float = None
+        longitude: float = None,
+        triage_history: List[Dict[str, Any]] = None  # New: past triage sessions
     ) -> Dict[str, Any]:
         """
         Perform triage assessment.
@@ -828,14 +873,10 @@ class PetTriageAgent:
             image_path: Path to image file (optional)
             latitude: User latitude for vet finder (optional)
             longitude: User longitude for vet finder (optional)
+            triage_history: List of past triage session dicts (optional)
 
         Returns:
-            Dict with:
-                - success: bool
-                - triage_response: Dict (TriageResponse schema)
-                - tools_used: List of tools called
-                - is_emergency: bool
-                - raw_output: Agent's raw text output
+            Dict with assessment results
         """
         import json
 
@@ -855,9 +896,19 @@ class PetTriageAgent:
         input_parts.append(f"Species: {species}")
         input_parts.append(f"Symptom Category: {category}")
 
-        if user_description:
-            input_parts.append(f"Description: {user_description}")
+        if triage_history:
+            history_str = "MEDICAL HISTORY (Past Triage Sessions):\n"
+            for i, session in enumerate(triage_history[:5], 1):  # Limit to 5
+                date = session.get("created_at", "Unknown Date").split("T")[0]
+                risk = session.get("risk_level", "Unknown")
+                cat = session.get("category", "Unknown")
+                desc = session.get("user_description", "No description")[:100]  # Truncate
+                history_str += f"- [{date}] Category: {cat} | Risk: {risk} | Desc: {desc}...\n"
+            input_parts.append(history_str)
 
+        if user_description:
+            input_parts.append(f"CURRENT DESCRIPTION: {user_description}")
+        
         if pet_profile:
             profile_str = ", ".join(f"{k}: {v}" for k, v in pet_profile.items() if v)
             input_parts.append(f"Pet Profile: {profile_str}")
@@ -881,7 +932,7 @@ class PetTriageAgent:
                         f.write(image_data)
                         image_source = f.name
                 
-                from image_analyzer import analyze_pet_image
+                from .image_analyzer import analyze_pet_image
                 image_analysis_result = analyze_pet_image(image_source, user_question=user_description)
                 image_desc = image_analysis_result.get("description", "")
                 

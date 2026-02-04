@@ -18,7 +18,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export type RiskLevel = 'ER' | 'TODAY' | 'SOON' | 'MONITOR';
 
-export type SymptomCategory = 
+export type SymptomCategory =
   | 'Toxic Ingestion & Poisoning'
   | 'Stomach Upset'
   | 'Itching & Skin Issues'
@@ -89,6 +89,7 @@ export interface ChatRequest {
   message: string;
   session_id?: string;
   pet_context?: Record<string, unknown>;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 export interface ChatResponse {
@@ -151,7 +152,7 @@ export async function getCategories(): Promise<{
   species: string[];
 }> {
   const response = await fetch(`${API_BASE_URL}/api/categories`);
-  
+
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
   }
@@ -169,7 +170,7 @@ export async function checkHealth(): Promise<{
   version: string;
 }> {
   const response = await fetch(`${API_BASE_URL}/api/health`);
-  
+
   if (!response.ok) {
     throw new Error(`Health check failed: ${response.status}`);
   }
