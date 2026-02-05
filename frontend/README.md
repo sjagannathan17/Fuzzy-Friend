@@ -1,36 +1,133 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Fuzzy Friend Frontend
+
+A Next.js 14 application providing the user interface for the Fuzzy Friend pet health triage system.
+
+## Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **State Management**: React Context API
+
+## Project Structure
+
+```
+frontend/
+├── app/                        # Next.js App Router pages
+│   ├── page.tsx                # Home page
+│   ├── layout.tsx              # Root layout
+│   ├── auth/page.tsx           # Login/Register page
+│   ├── chat/page.tsx           # Chat interface
+│   ├── onboarding/page.tsx     # Pet profile setup
+│   ├── profile/page.tsx        # User profile
+│   ├── settings/page.tsx       # App settings
+│   └── community-forum/        # Community features
+├── components/                 # Reusable UI components
+│   ├── AuthContext.tsx         # Authentication state
+│   ├── PetContext.tsx          # Pet profile state
+│   ├── TopNav.tsx              # Top navigation bar
+│   ├── BottomNav.tsx           # Bottom navigation bar
+│   └── chatbot/                # Chat UI components
+│       ├── ChatbotModal.tsx    # Main chat modal
+│       ├── useCameraCapture.ts # Camera hook
+│       └── useSymptomResultsNavigation.ts
+├── lib/                        # Utility functions
+│   └── api.ts                  # Backend API client
+├── public/                     # Static assets
+└── .env.local                  # Environment variables
+```
+
+## Features
+
+### Pages
+
+| Route | Description |
+|-------|-------------|
+| `/` | Home page with symptom checker |
+| `/auth` | User login and registration |
+| `/onboarding` | Pet profile setup wizard |
+| `/chat` | AI chat interface |
+| `/profile` | User and pet profile management |
+| `/settings` | App settings |
+| `/community-forum` | Community features |
+
+### Components
+
+- **AuthContext**: Manages user authentication state and JWT tokens
+- **PetContext**: Manages pet profile data across the app
+- **ChatbotModal**: Full-featured chat interface with:
+  - Symptom Checker mode (triage)
+  - General Question mode (chat)
+  - Image upload support
+  - Risk level display
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Installation
 
 ```bash
+# Install dependencies
+npm install
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Build for production
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create `.env.local` in the frontend directory:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-## Learn More
+## API Integration
 
-To learn more about Next.js, take a look at the following resources:
+The frontend communicates with the backend through `lib/api.ts`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Function | Endpoint | Description |
+|----------|----------|-------------|
+| `healthCheck` | GET /api/health | Check backend status |
+| `getCategories` | GET /api/categories | Get symptom categories |
+| `sendTriageRequest` | POST /api/triage | Submit triage request |
+| `sendChatMessage` | POST /api/chat | Send chat message |
+| `register` | POST /api/auth/register | User registration |
+| `login` | POST /api/auth/login | User login |
+| `savePetProfile` | POST /api/pet-profile | Save pet profile |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## State Management
 
-## Deploy on Vercel
+### Authentication Flow
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. User registers/logs in via `/auth`
+2. JWT token stored in localStorage
+3. AuthContext provides auth state to all components
+4. Protected routes redirect to `/auth` if not authenticated
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Onboarding Flow
+
+1. New users redirected to `/onboarding`
+2. User fills pet profile (name, species, breed, age)
+3. Profile saved to backend and localStorage
+4. User redirected to home page
+
+## Build and Deploy
+
+```bash
+# Type check
+npx tsc --noEmit
+
+# Build production bundle
+npm run build
+
+# Start production server
+npm start
+```

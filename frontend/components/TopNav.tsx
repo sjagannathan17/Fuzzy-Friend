@@ -2,10 +2,10 @@ import Link from "next/link";
 
 const links = [
   { href: "/", label: "Home", icon: "🏠" },
-  { href: "/onboarding", label: "Assess", icon: "🩺" },
+  { href: "/symptom-assistant", label: "Triage", icon: "🩺" },
   { href: "/chat", label: "Chat", icon: "💬" },
-  { href: "/forum", label: "Forum", icon: "👥" },
-  { href: "/settings", label: "Settings", icon: "⚙️" },
+  { href: "/community-forum", label: "Forum", icon: "👥" },
+  { href: "/profile", label: "Profile", icon: "👤" },
 ];
 
 export default function TopNav() {
