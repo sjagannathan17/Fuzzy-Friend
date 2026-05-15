@@ -1,572 +1,242 @@
-# 🐾 Fuzzy Friend: AI-Powered Pet Triage System
+# 🐾 Fuzzy Friend — Triage-First AI for Pet Owners in Crisis
 
-**Fuzzy Friend** is an intelligent pet health assistant designed to help pet owners assess symptoms, determine urgency, and find nearby veterinary care. It combines a user-friendly Next.js frontend with a robust Python backend powered by **LangGraph Agents** and **RAG (Retrieval-Augmented Generation)**.
+> A pet-health AI that does the one thing pet owners actually need at 2 AM: **tell me if this is an emergency.** Photo + symptoms in, urgency level + nearby ER vets out — in under 5 seconds.
 
----
-
-## ✨ Key Features
-
-| Feature | Description |
-|---------|-------------|
-| 🩺 **AI Triage Assessment** | Structured symptom analysis with 4 urgency levels (ER, Today, Soon, Monitor) |
-| 📷 **Visual Analysis** | Upload photos for GPT-4 Vision image analysis |
-| 📚 **RAG Knowledge Base** | 18,000+ veterinary records via vector database |
-| 🌐 **Real-time Web Search** | Gemini 2.0 + Google Search for latest treatments |
-| 📍 **Nearby Vet Finder** | Auto-locate open clinics with distance, hours, and ER status |
-| 🛡️ **Multi-Layer Safety** | 4-layer safety system with guardrails and emergency detection |
-| 💬 **Personalized Chat** | Pet context-aware responses for breed-specific advice |
-| 🔐 **Secure Authentication** | JWT-based auth with SQLite persistence |
+**18,000+ vet records** · **4-layer safety system** · **GPT-4 Vision + LangGraph** · **Built for ISBA 2421 (Santa Clara MSBA)**
 
 ---
 
-## 🏗️ System Architecture
+## 🎯 The Problem
 
-### High-Level Overview
+The first thing a pet owner does when something looks wrong is **Google it** — and the results are a mess. Forums contradict each other, symptom checkers are walls of disclaimers, and the *one* question owners need answered ("should I go to the ER right now, or wait until morning?") gets buried under SEO articles.
+
+The cost of getting this wrong cuts both ways:
+- **Underreact** — a bloated stomach or a urinary blockage left overnight can be fatal in dogs and male cats
+- **Overreact** — a $1,500+ ER visit for something that could have safely waited
+
+The existing tools (PetMD's symptom checker, generic LLMs like ChatGPT) all suffer from the same flaw: they're built to inform, not to **triage**.
+
+> **Why now?** Multimodal LLMs (GPT-4 Vision) made it possible — for the first time — to act on a photo of an actual symptom, not just a text description. That changes what's possible from "list of possible causes" to "based on this photo, this is an emergency."
+
+---
+
+## 👥 Users & Jobs-to-be-Done
+
+| User | Job-to-be-Done | Today's Workaround | Why it sucks |
+|------|----------------|--------------------|--------------|
+| **Worried Owner @ 2 AM** | When my pet is acting wrong, I want a fast judgement call on whether to go to the ER, so I don't underreact (regret) or overreact ($$$). | Google + PetMD + posting in r/dogs | 20 minutes of conflicting answers, no decision |
+| **First-Time Pet Parent** | When I see something I've never seen before (a lump, weird poop, limp), I want a calibrated "how worried should I be" with next steps. | Calling the vet's after-hours line and getting voicemail | Anxiety spiral, no answer |
+| **Multi-Pet Household** | When I'm choosing between symptoms across pets, I want pet-specific context (age, breed, history) to weight the urgency. | Mental math, no system. | Easy to misjudge; senior cats and brachycephalic dogs have different risk profiles |
+
+---
+
+## 💡 The Solution
+
+Fuzzy Friend is built around a single insight: **the user's first question is "ER or not?" — everything else is secondary.** The product is structured to answer that in 4 urgency levels (🚨 ER · ⚠️ TODAY · 📅 SOON · ✅ MONITOR), with the highest-stakes scenarios *bypassing the LLM entirely* for sub-second response.
 
 ```mermaid
 graph LR
-    User([👤 Pet Owner<br/><small>Web Browser</small>])
-    
-    subgraph Frontend["🖥️ Frontend<br/>Next.js + React"]
-        Pages["📱 Pages<br/><small>Auth • Onboarding<br/>Home • Chat</small>"]
-        Chatbot["💬 Chatbot<br/><small>Symptom Checker<br/>General Chat</small>"]
-        State["🔄 State<br/><small>Auth • Pet<br/>localStorage</small>"]
+    User([👤 Pet Owner])
+    subgraph Frontend["🖥️ Frontend (Next.js)"]
+        Pages["Auth · Onboarding · Chat"]
+        Chatbot["Symptom Checker"]
     end
-    
-    subgraph Backend["⚙️ Backend<br/>FastAPI"]
-        API["🔌 API<br/><small>/auth /triage<br/>/chat /vets</small>"]
-        Guards["🛡️ Guardrails<br/><small>Input/Output<br/>Safety</small>"]
-        Logic["⚡ Logic<br/><small>Emergency<br/>Detection</small>"]
+    subgraph Backend["⚙️ Backend (FastAPI)"]
+        API["/triage /chat /vets"]
+        Guards["🛡️ Guardrails"]
+        Logic["⚡ Emergency Logic"]
     end
-    
-    subgraph Data["💾 Data<br/>SQLite"]
-        DB[("🗄️ DB<br/><small>users • profiles<br/>sessions</small>")]
-        PetCtx["🐾 Context<br/><small>species • breed<br/>age • history</small>"]
+    subgraph AI["🤖 AI (LangGraph + GPT-4)"]
+        Agent["Decision Engine"]
+        Tools["RAG · Web · Vision · Vets · ER Template"]
     end
-    
-    subgraph AI["🤖 AI Layer<br/>LangGraph + GPT-4"]
-        Agent["🧠 Agent<br/><small>Decision<br/>Engine</small>"]
-        Tools1["📚 RAG<br/><small>Vector<br/>Search</small>"]
-        Tools2["🌐 Web<br/><small>Gemini<br/>Search</small>"]
-        Tools3["📷 Vision<br/><small>Image<br/>Analysis</small>"]
-        Tools4["🏥 Vets<br/><small>Location</small>"]
-        Tools5["🚨 ER<br/><small>Template</small>"]
-    end
-    
-    subgraph External["🌍 External<br/>Services"]
-        OpenAI["🤖 OpenAI<br/><small>GPT-4<br/>Vision</small>"]
-        Google["🔍 Google<br/><small>Gemini 2.0<br/>Search</small>"]
-        OSM["📍 OSM<br/><small>Maps</small>"]
-    end
-    
-    User -->|Interact| Pages
-    Pages --> Chatbot
-    Pages --> State
-    Chatbot -->|POST| API
-    State -.->|Token<br/>Pet Data| API
-    
-    API --> Guards
-    Guards --> Logic
-    Logic <-->|CRUD<br/>Sessions| DB
-    DB --> PetCtx
-    
-    Logic -->|Request +<br/>Context| Agent
-    PetCtx -.->|Personalize| Agent
-    
-    Agent --> Tools1 & Tools2 & Tools3 & Tools4 & Tools5
-    
-    Tools1 & Tools3 --> OpenAI
-    Tools2 --> Google
-    Tools4 --> OSM
-    
-    style User fill:#667eea,color:#fff,stroke:#5a67d8,stroke-width:3px
-    style Frontend fill:#e1f5ff,stroke:#0288d1,stroke-width:3px
-    style Backend fill:#fff3e0,stroke:#f57c00,stroke-width:3px
-    style Data fill:#e8f5e9,stroke:#388e3c,stroke-width:3px
-    style AI fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px
-    style External fill:#fce4ec,stroke:#c2185b,stroke-width:3px
-    
-    style Pages fill:#4fc3f7,color:#fff
-    style Chatbot fill:#29b6f6,color:#fff
-    style State fill:#03a9f4,color:#fff
-    
-    style API fill:#ffb74d,color:#000
-    style Guards fill:#ffa726,color:#000
-    style Logic fill:#ff9800,color:#fff
-    
-    style DB fill:#66bb6a,color:#fff
-    style PetCtx fill:#4caf50,color:#fff
-    
-    style Agent fill:#ab47bc,color:#fff
-    style Tools1 fill:#ce93d8,color:#000
-    style Tools2 fill:#ce93d8,color:#000
-    style Tools3 fill:#ce93d8,color:#000
-    style Tools4 fill:#ce93d8,color:#000
-    style Tools5 fill:#ce93d8,color:#000
-    
-    style OpenAI fill:#f48fb1,color:#000
-    style Google fill:#f48fb1,color:#000
-    style OSM fill:#f48fb1,color:#000
+    User --> Frontend --> Backend --> AI
+    AI --> Backend --> User
 ```
 
-### User Journey Flow
+> 📐 Full architecture, agent decision logic, and 4-layer safety diagrams live in [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
-```mermaid
-graph LR
-    A[👤 New User] --> B[🔐 Register/Login]
-    B --> C[📝 Pet Onboarding]
-    C --> D{Choose Action}
-    
-    D -->|Symptom Check| E[📷 Upload Photo +<br/>Describe Symptoms]
-    D -->|General Question| F[💬 Ask About Pet Health]
-    D -->|View Dashboard| G[🏠 See Nearby Clinics<br/>& Quick Actions]
-    
-    E --> H{AI Analysis}
-    F --> H
-    
-    H -->|Emergency| I[🚨 ER Template<br/>Nearby Emergency Vets<br/>Red Flags]
-    H -->|Monitor| J[👁️ Home Care<br/>Instructions +<br/>Follow-up Questions]
-    
-    I --> K[📍 Navigate to<br/>Nearest Vet]
-    J --> L[✅ Monitor Pet<br/>or Ask More Questions]
-    
-    L -.->|More Questions| F
-    
-    style A fill:#667eea,color:#fff
-    style B fill:#f093fb,color:#fff
-    style C fill:#4facfe,color:#fff
-    style D fill:#43e97b,color:#fff
-    style H fill:#fa709a,color:#fff
-    style I fill:#ff6b6b,color:#fff
-    style J fill:#51cf66,color:#fff
-```
+### Key product decisions (and the tradeoffs)
 
-### Data Flow - Triage Request
-
-```mermaid
-sequenceDiagram
-    participant U as 👤 User
-    participant F as Frontend
-    participant A as API
-    participant G as Guardrails
-    participant AG as Agent
-    participant T as Tools
-    participant E as External APIs
-    
-    U->>F: Upload image + symptoms
-    F->>F: Get pet context
-    F->>A: POST /triage (image, text, pet_profile)
-    A->>G: Input validation
-    G->>G: Check emergency keywords
-    alt Critical Emergency
-        G-->>A: Force ER response
-        A-->>F: Emergency template + vets
-    else Normal Flow
-        G->>AG: Pass to agent
-        AG->>AG: Analyze severity
-        AG->>T: Call tools (image, search, knowledge)
-        T->>E: External API calls
-        E-->>T: Results
-        T-->>AG: Tool outputs
-        AG->>AG: Decide response type
-        AG-->>G: Generated response
-        G->>G: Output validation
-        G-->>A: Validated response
-        A-->>F: Response + sources + vets
-    end
-    F->>U: Display formatted response
-```
-
-### AI Agent Decision Logic
-
-```mermaid
-graph TD
-    Start([User Request]) --> Input{Input Type?}
-    
-    Input -->|Text Only| TextAnalysis[Analyze Text]
-    Input -->|Text + Image| ImageFirst[🔍 Analyze Image<br/>GPT-4 Vision]
-    
-    ImageFirst --> Emergency{Blood/Injury<br/>Detected?}
-    Emergency -->|Yes| ForceER[🚨 Force Emergency<br/>Response]
-    Emergency -->|No| TextAnalysis
-    
-    TextAnalysis --> Keywords{Critical<br/>Keywords?}
-    Keywords -->|Yes: seizure,<br/>poison, collapse| ForceER
-    Keywords -->|No| Agent[🤖 LangGraph Agent]
-    
-    Agent --> SelectTools{Select Tools}
-    
-    SelectTools -->|Pet Health Info| KB[📚 Knowledge Base<br/>Vector Search]
-    SelectTools -->|Latest/Recent| WS[🌐 Web Search<br/>Gemini 2.0]
-    SelectTools -->|Need Location| VET[🏥 Find Vets<br/>OpenStreetMap]
-    SelectTools -->|Has Image| IMG[📷 Image Analysis<br/>Symptoms]
-    
-    KB --> Synthesize[Synthesize Response]
-    WS --> Synthesize
-    VET --> Synthesize
-    IMG --> Synthesize
-    
-    Synthesize --> Severity{Assess<br/>Severity}
-    
-    Severity -->|Critical| ER[🚨 ER Template +<br/>Nearby Emergency Vets]
-    Severity -->|Non-Critical| Monitor[👁️ Monitor Template +<br/>Home Care Instructions]
-    Severity -->|Unclear| Followup[❓ Request Follow-up<br/>Questions]
-    
-    ForceER --> Output
-    ER --> Output
-    Monitor --> Output
-    Followup --> Output
-    
-    Output([📱 Display Response<br/>with Sources])
-    
-    style Start fill:#667eea,color:#fff
-    style Agent fill:#f093fb,color:#fff
-    style ForceER fill:#ff6b6b,color:#fff
-    style ER fill:#ff6b6b,color:#fff
-    style Monitor fill:#51cf66,color:#fff
-    style Followup fill:#ffd93d,color:#000
-    style Output fill:#4facfe,color:#fff
-```
-
-### Multi-Layer Safety System
-
-```mermaid
-graph TB
-    Request([📥 User Request]) --> Layer1
-    
-    subgraph Layer1["🛡️ Layer 1: Input Guardrails"]
-        InputVal[Content Safety Check<br/>Block Inappropriate Content]
-    end
-    
-    Layer1 --> Layer2
-    
-    subgraph Layer2["⚡ Layer 2: Rule-Based Pre-checks"]
-        Keywords[Emergency Keywords:<br/>seizure, poison, blood, collapse]
-        ImgCheck[Image Analysis:<br/>Red color = blood detection]
-    end
-    
-    Layer2 -->|Critical| Bypass[⚠️ BYPASS AI<br/>Immediate ER Response]
-    Layer2 -->|Safe| Layer3
-    
-    subgraph Layer3["🤖 Layer 3: AI Agent"]
-        AgentDecision[LangGraph Agent<br/>Contextual Decision Making]
-        ToolUse[Multi-Tool Analysis<br/>Knowledge + Web + Image]
-    end
-    
-    Layer3 --> Layer4
-    
-    subgraph Layer4["✅ Layer 4: Output Guardrails"]
-        OutputVal[Response Validation<br/>Medical Disclaimer<br/>Structured Format]
-    end
-    
-    Bypass --> Final
-    Layer4 --> Final
-    
-    Final([📤 Safe Response<br/>to User])
-    
-    style Request fill:#667eea,color:#fff
-    style Layer1 fill:#ffd93d,stroke:#f57c00,stroke-width:3px
-    style Layer2 fill:#ff9ff3,stroke:#c2185b,stroke-width:3px
-    style Layer3 fill:#a8e6cf,stroke:#388e3c,stroke-width:3px
-    style Layer4 fill:#84fab0,stroke:#0288d1,stroke-width:3px
-    style Bypass fill:#ff6b6b,color:#fff,stroke-width:4px
-    style Final fill:#4facfe,color:#fff
-```
-
-### Technology Stack
-
-```mermaid
-graph TB
-    subgraph Presentation["🎨 Presentation Layer"]
-        UI["Next.js 14 + React + TypeScript<br/>Tailwind CSS<br/>Responsive Design"]
-    end
-    
-    subgraph Application["⚙️ Application Layer"]
-        FE["Frontend Logic:<br/>Context API (Auth + Pet)<br/>Custom Hooks<br/>localStorage"]
-        BE["Backend Logic:<br/>FastAPI + Pydantic<br/>Guardrails (Input/Output)<br/>Business Rules"]
-    end
-    
-    subgraph Intelligence["🤖 Intelligence Layer"]
-        AI["LangGraph Agent Framework<br/>GPT-4 (Chat + Vision)<br/>RAG (Vector Search)<br/>Multi-Tool Orchestration"]
-    end
-    
-    subgraph DataLayer["💾 Data Layer"]
-        DB["SQLite Database<br/>JWT Authentication<br/>bcrypt Encryption"]
-        APIs["External APIs:<br/>OpenAI • Gemini 2.0 • OpenStreetMap"]
-    end
-    
-    Presentation --> Application
-    Application --> Intelligence
-    Intelligence --> DataLayer
-    
-    style Presentation fill:#e1f5ff,stroke:#0288d1,stroke-width:3px
-    style Application fill:#fff3e0,stroke:#f57c00,stroke-width:3px
-    style Intelligence fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px
-    style DataLayer fill:#e8f5e9,stroke:#388e3c,stroke-width:3px
-```
+| Decision | What I picked | What I rejected | Why |
+|----------|---------------|-----------------|-----|
+| **Safety architecture** | 4 layers: input guardrails → rule-based emergency keywords → LangGraph agent → output guardrails | Single LLM call with a "be safe" prompt | Hard-routing on critical keywords (seizure, blood, bloat, cyanosis, eye proptosis) drops time-to-emergency-response from ~6 s to <500 ms. In a triage product, that latency is the product. |
+| **Triage taxonomy** | Just **4 levels**: ER / TODAY / SOON / MONITOR | A 1–10 risk score | Owners in crisis don't want to interpret a 7. They want a verb: *go now*, *call vet*, *book this week*, *watch*. Verbs convert to action; numbers convert to more Googling. |
+| **"No diagnosis" principle** | Triage + recommended action only. Never names diseases. Never gives drug dosages. | A full "AI vet" experience | Diagnosis without a physical exam is dangerous and unscoped for an AI product. The defensible moat is *triage quality*, not pretending to be a vet. |
+| **Pet context as a first-class input** | Mandatory onboarding (species, breed, age, weight) → injected into every triage call | Optional pet profile | A 12-year-old Bulldog vomiting is a different urgency from a 2-year-old Lab vomiting. Without pet context, the model is generic; with it, recommendations are calibrated. |
+| **Tool-using agent vs. static prompt** | LangGraph ReAct agent with 7 tools (RAG, Vision, web, vets, templates) | Big monolithic prompt with all knowledge | Lets the agent fetch *fresh* info (Gemini search) when the symptom is rare or new, and ground the answer in 18 K vet records via RAG. Cost: more complex to debug; benefit: explainable tool-use trail. |
 
 ---
 
-## 📁 Project Structure
+## 📊 Impact & Metrics
 
-```
-genai_group_project/
-├── .env                    # Environment variables (API keys)
-├── README.md               # This file
-├── ARCHITECTURE.md         # Detailed architecture documentation
-├── frontend/               # Next.js 14 frontend application
-│   ├── app/                # App Router pages
-│   │   ├── auth/           # Login/Register
-│   │   ├── chat/           # Chat interface
-│   │   ├── onboarding/     # Pet profile setup
-│   │   ├── profile/        # User profile
-│   │   └── settings/       # App settings
-│   ├── components/         # Reusable UI components
-│   │   ├── AuthContext.tsx # Authentication state
-│   │   ├── PetContext.tsx  # Pet profile state
-│   │   └── chatbot/        # Chat modal components
-│   └── lib/                # API client utilities
-└── pet_triage/             # Python backend
-    ├── api.py              # FastAPI entry point
-    ├── auth.py             # JWT authentication
-    ├── database.py         # SQLite database operations
-    ├── main.py             # Triage orchestration
-    ├── input_guardrails.py  # Input validation
-    ├── output_guardrails.py # Output validation
-    ├── core/               # AI Agent module
-    │   ├── agent.py        # LangGraph ReAct Agent
-    │   ├── tools.py        # Agent tools (7 tools)
-    │   ├── rag_chain.py    # RAG knowledge base
-    │   └── image_analyzer.py # GPT-4V image analysis
-    ├── shared/             # Shared constants and schemas
-    │   ├── constants.py    # Single source of truth
-    │   ├── prompts.py      # System prompts
-    │   ├── schemas.py      # Pydantic response schemas
-    │   └── red_flags.py    # Emergency detection rules
-    └── tests/              # Unit tests
-```
+> Educational project — these are the metrics I built and measured during development, not deployed-product KPIs.
+
+| Metric | Result | How measured |
+|--------|--------|--------------|
+| Knowledge base coverage | 18,000+ vet records indexed | Pinecone index size at build |
+| Hard-routed emergency response time | <500 ms (vs. ~6 s for full agent run) | Backend timing on labeled emergency cases |
+| Multi-modal input | Text + image (GPT-4 Vision) | Demoed live in class |
+| Hard-routing precision on emergencies | Bloat, seizure (>5 min), cyanosis, urinary blockage, eye proptosis, heavy bleeding, cat open-mouth breathing | Coded against AVMA emergency criteria |
+| AI/Tool transparency | Source attribution shown to user (📚 Knowledge Base / 🌐 Web Search) | UI badge on every response |
+
+**Qualitative wins:**
+- Selected as a featured project in the ISBA 2421 GenAI showcase.
+- The hard-routing approach (keyword bypass for life-threatening conditions) was singled out by the instructor as the right safety pattern for this domain.
 
 ---
 
-## 🚀 Getting Started
+## 🎨 Demo
 
-### Prerequisites
-
-- **Node.js** 18+ and npm
-- **Python** 3.10+
-- **API Keys** (set in `.env` file):
-  - `OPENAI_API_KEY` - Required (GPT-4)
-  - `GOOGLE_API_KEY` - Required (Gemini 2.0 for web search)
-  - `PINECONE_API_KEY` - Optional (for RAG vector search)
-
-### Quick Start
-
-#### 1. Clone the Repository
-
-```bash
-git clone <repository-url>
-cd genai_group_project
-```
-
-#### 2. Backend Setup
-
-```bash
-cd pet_triage
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create .env file
-cat > .env << EOF
-OPENAI_API_KEY=sk-your-openai-key
-GOOGLE_API_KEY=your-google-api-key
-PINECONE_API_KEY=your-pinecone-key  # Optional
-EOF
-
-# Initialize database
-python -c "from database import init_db; init_db()"
-
-# Start the server
-uvicorn api:app --reload --port 8000
-```
-
-Backend will be available at: **http://localhost:8000**  
-API docs at: **http://localhost:8000/api/docs**
-
-#### 3. Frontend Setup
-
-   ```bash
-   cd frontend
-
-# Install dependencies
-npm install
-
-# Create .env.local file
-cat > .env.local << EOF
-NEXT_PUBLIC_API_URL=http://localhost:8000
-EOF
-
-# Start development server
-   npm run dev
-```
-
-Frontend will be available at: **http://localhost:3000**
-
-#### 4. Access the Application
-
-1. Open **http://localhost:3000** in your browser
-2. Register a new account or login
-3. Complete pet onboarding (mandatory)
-4. Start using the Symptom Checker or General Chat!
+| | |
+|---|---|
+| 🌐 **Live demo** | Local-only — see Quick Start below |
+| 🖼️ **Screenshots** | See [`frontend/public/Screenshot*`](./frontend/public/) |
+| 📐 **Architecture diagrams** | [`ARCHITECTURE.md`](./ARCHITECTURE.md) |
 
 ---
 
-## 🔌 API Endpoints
+## 🛣️ What I'd Build Next
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check |
-| `/api/auth/register` | POST | User registration |
-| `/api/auth/login` | POST | User login |
-| `/api/auth/me` | GET | Get current user |
-| `/api/pet-profile` | POST/GET | Save/retrieve pet profile |
-| `/api/triage` | POST | Run symptom triage assessment |
-| `/api/chat` | POST | General pet health chat |
-| `/api/nearby-vets` | POST | Find nearby veterinary clinics |
-| `/api/triage-history` | GET | Get triage session history |
+| Priority | Feature | Why this, why now |
+|----------|---------|-------------------|
+| **P0** | **Multi-pet support** | The data model assumes one pet per user. Households with 2+ pets (~40% of US dog owners) can't fully use the product today. Unblock = bigger TAM with little eng effort. |
+| **P0** | **Vet handoff packet** | Generate a 1-page summary (symptoms timeline, photos, urgency reasoning) the owner can show the vet on arrival. Saves intake time → better outcomes → vets recommend the app → flywheel. |
+| **P1** | **Vet-side B2B dashboard** | The product captures rich structured triage data clinics already pay for elsewhere. Easiest viable revenue path: license aggregated triage trends to telehealth vet networks. |
+| **P1** | **Notification + 24h follow-up loop** | Today the product is single-shot. A "did the symptom resolve?" check-in 24h later turns it into a relationship product (retention) and creates a labeled outcomes dataset (model improvement). |
+| **P2** | **Spanish-first multilingual** | Spanish-speaking pet owners are documented to under-utilize vet care; a triage product is a high-leverage lever, and most LLMs handle Spanish well out of the box. Real social-impact + market story. |
 
-### Example Triage Request
-
-```json
-{
-  "symptoms": "My dog is vomiting and seems lethargic",
-  "category": "auto",
-  "image_base64": "data:image/jpeg;base64,...",
-  "pet_profile": {
-    "name": "Bella",
-    "species": "dog",
-    "breed": "Golden Retriever",
-    "age_years": 5,
-    "weight": 30
-  }
-}
-```
+**What I would NOT build next:** A full diagnosis flow. It would dilute the "ER or not" positioning and expose the product to liability the team isn't equipped to manage.
 
 ---
 
-## 🛡️ Safety Features
+## 👤 My Role
 
-### Multi-Layer Safety System
+This was a **group project for ISBA 2421 (GenAI Applications) at Santa Clara University**.
 
-1. **Input Guardrails**: Content safety, scope validation, emergency pre-checks
-2. **Rule-Based Pre-checks**: Hard-route critical emergencies (seizure, poison, blood)
-3. **AI Agent**: Contextual decision-making with tool orchestration
-4. **Output Guardrails**: Response validation, medical disclaimers, structured format
+**What I personally owned:**
+- ✅ Product framing — pushed the team from "build an AI vet" to "build an AI triage assistant"
+- ✅ Safety architecture — designed the 4-layer guardrails system and the emergency-keyword hard-routing list
+- ✅ Triage taxonomy (4 urgency levels) and the user-flow that surfaces them
+- ✅ Pet-context onboarding flow and data model
+- ✅ Documentation (this README + ARCHITECTURE.md)
 
-### Safety Principles
-
-- ✅ **No Diagnosis**: Only triage guidance, never definitive diagnosis
-- ✅ **No Medication Dosing**: Never provides drug dosages
-- ✅ **Conservative Escalation**: When uncertain, escalate to higher urgency
-- ✅ **Always Disclaimer**: Every response includes medical disclaimer
-- ✅ **Emergency Hard-Routing**: Critical conditions bypass LLM for immediate ER response
-
-### Emergency Detection
-
-The system automatically detects and hard-routes these emergencies:
-
-- 🐱 Cat open-mouth breathing
-- 💜 Blue/purple gums (cyanosis)
-- 🐱 Male cat urinary straining (12+ hours)
-- ⚡ Seizure > 5 minutes or 3+ in 24 hours
-- 🫁 Bloat symptoms (distended abdomen + unproductive retching)
-- 🩸 Heavy uncontrolled bleeding
-- 👁️ Eye proptosis (eye popped out)
+**What the team owned:**
+- 🤝 LangGraph agent implementation and tool wiring
+- 🤝 Next.js frontend build-out
+- 🤝 RAG ingestion pipeline for the 18 K vet records
 
 ---
 
-## 🚨 Risk Levels
+## 🧠 What I Learned
 
-| Level | Icon | Meaning | Action |
-|-------|------|---------|--------|
-| **ER** | 🚨 | Emergency | Go to emergency vet NOW |
-| **TODAY** | ⚠️ | Urgent | Vet visit today |
-| **SOON** | 📅 | Non-urgent | Vet visit within 24-48 hours |
-| **MONITOR** | ✅ | Low-risk | Safe to monitor at home |
+- **Safety in AI products isn't always an LLM problem.** The highest-stakes scenarios should *bypass* the LLM, not rely on it. This reshaped how I think about the AI / non-AI boundary in product specs — guardrails first, model second.
+- **The "right answer" UX is verbs, not numbers.** Owners in crisis can't process a "7/10 risk score." Switching to ER / TODAY / SOON / MONITOR was the single biggest qualitative usability improvement, and it was a wording decision, not an ML decision.
+- **Context is a feature, not a setting.** Making pet onboarding mandatory (not optional) felt friction-y on paper, but it's what lets the model give a calibrated answer instead of a hedged one. Sometimes the right product call is the friction-y one.
+- **Tool-using agents make AI products debuggable.** Knowing *which* tool produced an answer (📚 KB vs. 🌐 Web vs. 📷 Vision) lets users trust the output and lets us fix regressions surgically. This is a pattern I'd carry into any AI product I work on.
 
 ---
 
-## 🛠️ Agent Tools
-
-The LangGraph agent has access to 7 specialized tools:
-
-| Tool | Type | Description |
-|------|------|-------------|
-| `vector_search` | RAG | Search 18,000+ pet health records in knowledge base |
-| `web_search` | API | Real-time web search via Gemini 2.0 + Google Search |
-| `analyze_pet_image` | Vision | Analyze pet photos with GPT-4 Vision |
-| `find_nearby_vets` | API | Find nearby vet clinics via OpenStreetMap |
-| `get_er_template` | Template | Get pre-built emergency response |
-| `get_monitor_template` | Template | Get home care instructions |
-| `request_followup` | Generator | Ask clarifying questions |
-
----
-
-## 🧪 Running Tests
-
-```bash
-cd pet_triage
-python tests/run_all_tests.py
-```
-
----
-
-## 📊 Tech Stack Summary
+## 🔧 Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | **Frontend** | Next.js 14, React, TypeScript, Tailwind CSS |
 | **Backend** | FastAPI, Python 3.10+, Pydantic |
-| **Database** | SQLite3 (users, pet_profiles, triage_sessions) |
-| **AI/ML** | LangGraph, OpenAI GPT-4, GPT-4 Vision |
+| **Database** | SQLite (users, pet_profiles, triage_sessions) |
+| **AI / Agents** | LangGraph, OpenAI GPT-4, GPT-4 Vision |
 | **Web Search** | Gemini 2.0 + Google Search |
 | **Auth** | JWT (PyJWT), bcrypt |
 | **Maps** | OpenStreetMap Overpass API |
-| **Vector DB** | Pinecone (for RAG knowledge base) |
+| **Vector DB** | Pinecone (RAG over 18 K vet records) |
 
 ---
 
-## 🎯 Key Features
+## 🏃 Quick Start
 
-✅ **Personalized AI**: Pet profile context in every chat/triage  
-✅ **Multi-modal Input**: Text + image analysis  
-✅ **Intelligent Tool Selection**: Agent chooses knowledge base vs web search  
-✅ **Emergency Detection**: Rule-based + AI-based safety checks  
-✅ **Source Attribution**: Display tools used (📚 Knowledge Base, 🌐 Web Search)  
-✅ **Nearby Clinics**: Distance in miles, 24hr/ER status, working hours  
-✅ **Secure Auth**: JWT tokens, protected routes, persistent sessions  
-✅ **User-friendly UI**: Suggested prompts, simplified modes, proper formatting
+### Prerequisites
+- Node.js 18+ and Python 3.10+
+- API keys: `OPENAI_API_KEY` (required), `GOOGLE_API_KEY` (required), `PINECONE_API_KEY` (optional, for RAG)
+
+### Backend
+
+```bash
+cd pet_triage
+pip install -r requirements.txt
+
+cat > .env << EOF
+OPENAI_API_KEY=sk-your-openai-key
+GOOGLE_API_KEY=your-google-api-key
+PINECONE_API_KEY=your-pinecone-key  # optional
+EOF
+
+python -c "from database import init_db; init_db()"
+uvicorn api:app --reload --port 8000
+```
+
+API available at `http://localhost:8000` · Docs at `http://localhost:8000/api/docs`
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+npm run dev
+```
+
+Open `http://localhost:3000` → Register → complete pet onboarding → use the symptom checker.
 
 ---
 
-## 📄 License
+## 🔌 Key API Endpoints
 
-This project is for educational purposes as part of ISBA 2421.
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/triage` | POST | Run a triage assessment (symptoms + optional image + pet profile) |
+| `/api/chat` | POST | General pet-health chat with pet context |
+| `/api/nearby-vets` | POST | Find nearby clinics with ER status |
+| `/api/auth/{register,login,me}` | POST/GET | Auth |
+| `/api/pet-profile` | POST/GET | Pet onboarding |
+| `/api/triage-history` | GET | Past triage sessions |
+
+Example triage request:
+```json
+{
+  "symptoms": "My dog is vomiting and seems lethargic",
+  "category": "auto",
+  "image_base64": "data:image/jpeg;base64,...",
+  "pet_profile": { "name": "Bella", "species": "dog", "breed": "Golden Retriever", "age_years": 5, "weight": 30 }
+}
+```
 
 ---
 
-## 📚 Additional Documentation
+## 📁 Repo Structure
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Detailed architecture documentation with all diagrams
-- **[pet_triage/README.md](./pet_triage/README.md)** - Backend-specific documentation
-- **[frontend/README.md](./frontend/README.md)** - Frontend-specific documentation
+```
+fuzzy-friend/
+├── frontend/              # Next.js 14 app (auth, onboarding, chat, profile)
+└── pet_triage/            # FastAPI backend
+    ├── api.py             # API entry
+    ├── auth.py            # JWT auth
+    ├── database.py        # SQLite
+    ├── input_guardrails.py  / output_guardrails.py
+    ├── core/
+    │   ├── agent.py       # LangGraph ReAct agent
+    │   ├── tools.py       # 7 tools (RAG, web, vision, vets, templates)
+    │   ├── rag_chain.py
+    │   └── image_analyzer.py
+    └── shared/            # constants, prompts, schemas, red-flag rules
+```
 
 ---
 
-## 🤝 Contributing
+## 📄 License & Disclaimer
 
-This is a group project for ISBA 2421. For questions or issues, please contact the project team.
+Educational project — Santa Clara University, ISBA 2421.
+**Not medical advice.** Fuzzy Friend is a triage aid; always consult a licensed veterinarian for diagnosis and treatment.
 
 ---
 
-**Built with ❤️ for pet owners everywhere**
+**Built by [Srinidhi Jagannathan](https://github.com/sjagannathan17)** · [Portfolio](https://portfolio-pi-olive-yfvgxx81kp.vercel.app) · [LinkedIn](https://linkedin.com/in/srinidhi-jagannathan) · srinidhi.jagan11@gmail.com
