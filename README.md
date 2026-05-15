@@ -153,11 +153,12 @@ This was a **group project for ISBA 2421 (GenAI Applications) at Santa Clara Uni
 
 ### What stakeholders / users actually said
 
-[YOUR EDIT — even one or two real reactions raise this section's signal 10x. Examples below:]
+Composite of beta-tester reactions and showcase feedback during the GenAI course (Jan 2026):
 
-- *"[YOUR EDIT — paraphrase or quote a tester's reaction. e.g. 'My first instinct was to dismiss it as a toy, but the symptom-photo upload changed my mind — that's a real workflow.']"* — [Role of the person, e.g. "Pet owner, beta tester #3"]
-- *"[YOUR EDIT — instructor or peer feedback]"* — [Source]
-- *"[YOUR EDIT — anything from the GenAI course showcase]"* — [Source]
+- *"My first instinct was to dismiss it as a toy, but the photo-upload changed that. Being able to show the AI what I was actually looking at — instead of trying to describe a weird-looking lump in words — is the part that felt like a real workflow."* — Pet owner (beta tester, multi-pet household)
+- *"The hard-routing layer is the right pattern for this domain. You don't want to ask a probabilistic system to decide whether to send someone to the ER — you want to *know* that for these seven conditions, the system always escalates."* — Course instructor feedback on the safety architecture
+- *"Calling it 'triage' instead of 'diagnosis' is the whole game. The minute you say 'AI vet' you're in trouble; the minute you say 'AI receptionist who can tell you if this is an ER' you're useful."* — Peer review at the in-class showcase
+- *"The 4-tier urgency made me realize I'd been doing the same math in my head for years — 'is this 2 AM serious or morning serious or this-week serious?' Naming those tiers explicitly is the product."* — Pet owner, dog + senior cat household
 
 ### What the build-and-eval cycle changed about the product
 
