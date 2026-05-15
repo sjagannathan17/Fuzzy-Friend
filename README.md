@@ -1,4 +1,4 @@
-# 🐾 Fuzzy Friend — Triage-First AI for Pet Owners in Crisis
+# Fuzzy Friend — Triage-First AI for Pet Owners in Crisis
 
 > A pet-health AI that does the one thing pet owners actually need at 2 AM: **tell me if this is an emergency.** Photo + symptoms in, urgency level + nearby ER vets out — in under 5 seconds.
 
@@ -6,7 +6,7 @@
 
 ---
 
-## 🎯 The Problem
+## The Problem
 
 The first thing a pet owner does when something looks wrong is **Google it** — and the results are a mess. Forums contradict each other, symptom checkers are walls of disclaimers, and the *one* question owners need answered ("should I go to the ER right now, or wait until morning?") gets buried under SEO articles.
 
@@ -20,7 +20,7 @@ The existing tools (PetMD's symptom checker, generic LLMs like ChatGPT) all suff
 
 ---
 
-## 👥 Users & Jobs-to-be-Done
+## Users & Jobs-to-be-Done
 
 | User | Job-to-be-Done | Today's Workaround | Why it sucks |
 |------|----------------|--------------------|--------------|
@@ -30,23 +30,23 @@ The existing tools (PetMD's symptom checker, generic LLMs like ChatGPT) all suff
 
 ---
 
-## 💡 The Solution
+## The Solution
 
-Fuzzy Friend is built around a single insight: **the user's first question is "ER or not?" — everything else is secondary.** The product is structured to answer that in 4 urgency levels (🚨 ER · ⚠️ TODAY · 📅 SOON · ✅ MONITOR), with the highest-stakes scenarios *bypassing the LLM entirely* for sub-second response.
+Fuzzy Friend is built around a single insight: **the user's first question is "ER or not?" — everything else is secondary.** The product is structured to answer that in 4 urgency levels (ER · TODAY · SOON · MONITOR), with the highest-stakes scenarios *bypassing the LLM entirely* for sub-second response.
 
 ```mermaid
 graph LR
-    User([👤 Pet Owner])
-    subgraph Frontend["🖥️ Frontend (Next.js)"]
+    User([Pet Owner])
+    subgraph Frontend["Frontend (Next.js)"]
         Pages["Auth · Onboarding · Chat"]
         Chatbot["Symptom Checker"]
     end
-    subgraph Backend["⚙️ Backend (FastAPI)"]
+    subgraph Backend["Backend (FastAPI)"]
         API["/triage /chat /vets"]
-        Guards["🛡️ Guardrails"]
-        Logic["⚡ Emergency Logic"]
+        Guards["Guardrails"]
+        Logic["Emergency Logic"]
     end
-    subgraph AI["🤖 AI (LangGraph + GPT-4)"]
+    subgraph AI["AI (LangGraph + GPT-4)"]
         Agent["Decision Engine"]
         Tools["RAG · Web · Vision · Vets · ER Template"]
     end
@@ -54,7 +54,7 @@ graph LR
     AI --> Backend --> User
 ```
 
-> 📐 Full architecture, agent decision logic, and 4-layer safety diagrams live in [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+> Full architecture, agent decision logic, and 4-layer safety diagrams live in [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ### Key product decisions (and the tradeoffs)
 
@@ -68,7 +68,7 @@ graph LR
 
 ---
 
-## 📊 Impact & Metrics
+## Impact & Metrics
 
 > Educational project — these are the metrics I built and measured during development, not deployed-product KPIs.
 
@@ -78,7 +78,7 @@ graph LR
 | Hard-routed emergency response time | <500 ms (vs. ~6 s for full agent run) | Backend timing on labeled emergency cases |
 | Multi-modal input | Text + image (GPT-4 Vision) | Demoed live in class |
 | Hard-routing precision on emergencies | Bloat, seizure (>5 min), cyanosis, urinary blockage, eye proptosis, heavy bleeding, cat open-mouth breathing | Coded against AVMA emergency criteria |
-| AI/Tool transparency | Source attribution shown to user (📚 Knowledge Base / 🌐 Web Search) | UI badge on every response |
+| AI/Tool transparency | Source attribution shown to user (Knowledge Base /  Web Search) | UI badge on every response |
 
 **Qualitative wins:**
 - Selected as a featured project in the ISBA 2421 GenAI showcase.
@@ -86,17 +86,17 @@ graph LR
 
 ---
 
-## 🎨 Demo
+## Demo
 
 | | |
 |---|---|
-| 🌐 **Live demo** | Local-only — see Quick Start below |
-| 🖼️ **Screenshots** | See [`frontend/public/Screenshot*`](./frontend/public/) |
-| 📐 **Architecture diagrams** | [`ARCHITECTURE.md`](./ARCHITECTURE.md) |
+| **Live demo** | Local-only — see Quick Start below |
+| **Screenshots** | See [`frontend/public/Screenshot*`](./frontend/public/) |
+| **Architecture diagrams** | [`ARCHITECTURE.md`](./ARCHITECTURE.md) |
 
 ---
 
-## 🛣️ What I'd Build Next
+## What I'd Build Next
 
 | Priority | Feature | Why this, why now |
 |----------|---------|-------------------|
@@ -110,34 +110,34 @@ graph LR
 
 ---
 
-## 👤 My Role
+## My Role
 
 This was a **group project for ISBA 2421 (GenAI Applications) at Santa Clara University**.
 
 **What I personally owned:**
-- ✅ Product framing — pushed the team from "build an AI vet" to "build an AI triage assistant"
-- ✅ Safety architecture — designed the 4-layer guardrails system and the emergency-keyword hard-routing list
-- ✅ Triage taxonomy (4 urgency levels) and the user-flow that surfaces them
-- ✅ Pet-context onboarding flow and data model
-- ✅ Documentation (this README + ARCHITECTURE.md)
+- Product framing — pushed the team from "build an AI vet" to "build an AI triage assistant"
+- Safety architecture — designed the 4-layer guardrails system and the emergency-keyword hard-routing list
+- Triage taxonomy (4 urgency levels) and the user-flow that surfaces them
+- Pet-context onboarding flow and data model
+- Documentation (this README + ARCHITECTURE.md)
 
 **What the team owned:**
-- 🤝 LangGraph agent implementation and tool wiring
-- 🤝 Next.js frontend build-out
-- 🤝 RAG ingestion pipeline for the 18 K vet records
+- LangGraph agent implementation and tool wiring
+- Next.js frontend build-out
+- RAG ingestion pipeline for the 18 K vet records
 
 ---
 
-## 🧠 What I Learned
+## What I Learned
 
 - **Safety in AI products isn't always an LLM problem.** The highest-stakes scenarios should *bypass* the LLM, not rely on it. This reshaped how I think about the AI / non-AI boundary in product specs — guardrails first, model second.
 - **The "right answer" UX is verbs, not numbers.** Owners in crisis can't process a "7/10 risk score." Switching to ER / TODAY / SOON / MONITOR was the single biggest qualitative usability improvement, and it was a wording decision, not an ML decision.
 - **Context is a feature, not a setting.** Making pet onboarding mandatory (not optional) felt friction-y on paper, but it's what lets the model give a calibrated answer instead of a hedged one. Sometimes the right product call is the friction-y one.
-- **Tool-using agents make AI products debuggable.** Knowing *which* tool produced an answer (📚 KB vs. 🌐 Web vs. 📷 Vision) lets users trust the output and lets us fix regressions surgically. This is a pattern I'd carry into any AI product I work on.
+- **Tool-using agents make AI products debuggable.** Knowing *which* tool produced an answer (KB vs. Web vs. Vision) lets users trust the output and lets us fix regressions surgically. This is a pattern I'd carry into any AI product I work on.
 
 ---
 
-## 🔧 Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
@@ -152,7 +152,7 @@ This was a **group project for ISBA 2421 (GenAI Applications) at Santa Clara Uni
 
 ---
 
-## 🏃 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Node.js 18+ and Python 3.10+
@@ -167,7 +167,7 @@ pip install -r requirements.txt
 cat > .env << EOF
 OPENAI_API_KEY=sk-your-openai-key
 GOOGLE_API_KEY=your-google-api-key
-PINECONE_API_KEY=your-pinecone-key  # optional
+PINECONE_API_KEY=your-pinecone-key # optional
 EOF
 
 python -c "from database import init_db; init_db()"
@@ -189,7 +189,7 @@ Open `http://localhost:3000` → Register → complete pet onboarding → use th
 
 ---
 
-## 🔌 Key API Endpoints
+## Key API Endpoints
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
@@ -212,12 +212,12 @@ Example triage request:
 
 ---
 
-## 📁 Repo Structure
+## Repo Structure
 
 ```
 fuzzy-friend/
-├── frontend/              # Next.js 14 app (auth, onboarding, chat, profile)
-└── pet_triage/            # FastAPI backend
+├── frontend/ # Next.js 14 app (auth, onboarding, chat, profile)
+└── pet_triage/ # FastAPI backend
     ├── api.py             # API entry
     ├── auth.py            # JWT auth
     ├── database.py        # SQLite
@@ -232,7 +232,7 @@ fuzzy-friend/
 
 ---
 
-## 📄 License & Disclaimer
+## License & Disclaimer
 
 Educational project — Santa Clara University, ISBA 2421.
 **Not medical advice.** Fuzzy Friend is a triage aid; always consult a licensed veterinarian for diagnosis and treatment.
