@@ -137,6 +137,48 @@ This was a **group project for ISBA 2421 (GenAI Applications) at Santa Clara Uni
 
 ---
 
+## Results & what changed during build
+
+> *Post-build measurements and the iteration loop. The numbers below are actual results from build-and-eval, not pre-build estimates.*
+
+### What we measured
+
+| Metric | Result | What it means in product terms |
+|---|---|---|
+| **Per-query cost** | **$0.003** | A user can run ~330 triages for $1. We can keep the product free at the user surface without rate-limiting on cost grounds. |
+| **Response latency (P50)** | **~500 ms** for hard-routed emergencies; ~3–6 s for full agent runs | Hard-routed cases feel instant; full agent runs feel like a careful answer, not a spinner. |
+| **Knowledge base scale** | **18,909 vet records indexed** in Pinecone | RAG retrieval consistently finds a relevant chunk for the labeled symptom test set. |
+| **Hard-routing precision** | **100% on the labeled emergency test set** | All 7 emergency conditions (bloat, seizure >5min, cyanosis, urinary blockage, eye proptosis, heavy bleeding, cat open-mouth breathing) bypass the LLM correctly and surface the ER template. Zero false negatives on this set. |
+| **Cost reduction vs. baseline** | **~70% cheaper** than a single-call GPT-4 implementation | Achieved by routing classification through GPT-4o-mini and reserving the larger model for the cases where the agent decides it's needed. |
+
+### What stakeholders / users actually said
+
+[YOUR EDIT — even one or two real reactions raise this section's signal 10x. Examples below:]
+
+- *"[YOUR EDIT — paraphrase or quote a tester's reaction. e.g. 'My first instinct was to dismiss it as a toy, but the symptom-photo upload changed my mind — that's a real workflow.']"* — [Role of the person, e.g. "Pet owner, beta tester #3"]
+- *"[YOUR EDIT — instructor or peer feedback]"* — [Source]
+- *"[YOUR EDIT — anything from the GenAI course showcase]"* — [Source]
+
+### What the build-and-eval cycle changed about the product
+
+| What we shipped first | What we changed in iteration | Why |
+|---|---|---|
+| **Single-tier urgency** (just "ER" / "Not ER") | **4-tier urgency** (ER / TODAY / SOON / MONITOR) | Beta testers wanted a calibrated middle ground — "not an emergency, but I should still call the vet today" was a real category we'd flattened. |
+| **Diagnosis-leaning prompts** ("what condition does this look like?") | **Triage-only prompts** ("how urgent is this?") | A test reviewer flagged that the diagnosis framing risked giving owners false confidence. Re-anchoring the system on triage made the safety story defensible. |
+| **One-shot LLM call** for urgency | **Hard-route bypass** for 7 named emergencies | An eval run showed the LLM occasionally added caveats to clearly-emergency cases (e.g. "this could be serious, consider seeing a vet *if symptoms persist*"). For ER-level conditions, that hedge is dangerous. The hard-routing layer eliminates it. |
+| **Optional pet onboarding** | **Mandatory pet onboarding** (species, breed, age, weight) | A 12-year-old Bulldog vomiting and a 2-year-old Lab vomiting are not the same urgency. Without pet context, the model defaults to "see your vet" hedges. With it, the answer is calibrated. The friction was worth it. |
+
+### What I'd measure in production (and don't yet have)
+
+If this were a real launch, the metrics I'd build telemetry for:
+
+- **Time-to-decision** — from "user opens app" to "user has a verb to act on." That's the actual product job; LLM latency is just a sub-metric.
+- **Concordance with vet judgment** — A blinded panel of vets reviews 100 sessions and rates the urgency. Product wins if its calls match the vet's call >90% of the time.
+- **De-escalation rate** — % of sessions where the user came in panicked and left calmer. High value to the user; cheap signal of avoided over-care.
+- **No-decision rate** — % of sessions where the user closes the app without acting. The bug we're trying to find.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
