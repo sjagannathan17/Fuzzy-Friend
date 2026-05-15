@@ -239,4 +239,4 @@ Educational project — Santa Clara University, ISBA 2421.
 
 ---
 
-**Built by [Srinidhi Jagannathan](https://github.com/sjagannathan17)** · [Portfolio](https://portfolio-pi-olive-yfvgxx81kp.vercel.app) · [LinkedIn](https://linkedin.com/in/srinidhi-jagannathan) · srinidhi.jagan11@gmail.com
+**Built by [Srinidhi Jagannathan](https://github.com/sjagannathan17)** · [Portfolio](https://sjagannathan17.github.io/portfolio) · [LinkedIn](https://linkedin.com/in/srinidhi-jagannathan) · srinidhi.jagan11@gmail.com
